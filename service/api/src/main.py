@@ -1,11 +1,21 @@
+import logging
 from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from src.api.routes.campaigns import router as campaigns_router
 from src.api.routes.health import router as health_router
 from src.api.routes.view import router as view_router
+from src.config import get_settings
+from src.domain import models  # noqa: F401
+from src.infrastructure.db.base import Base
+from src.infrastructure.db.session import engine
 
 app = FastAPI()
+settings = get_settings()
+
+logging.basicConfig(level=settings.log_level)
 
 # Static files (css, js, images)
 BASE_DIR = Path(__file__).resolve().parent
@@ -16,3 +26,9 @@ templates = Jinja2Templates(directory="src/templates")
 
 app.include_router(health_router)
 app.include_router(view_router)
+app.include_router(campaigns_router)
+
+
+@app.on_event("startup")
+def create_tables() -> None:
+    Base.metadata.create_all(bind=engine)
