@@ -1,7 +1,14 @@
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
-from src.api.schemas.campaigns import CampaignCreate
-from src.api.service.campaigns import create_campaign, delete_campaign, get_campaign_by_id, get_campaign_by_name, list_campaigns
+from src.api.schemas.campaigns import CampaignCreate, CampaignUpdate
+from src.api.service.campaigns import (
+    create_campaign,
+    delete_campaign,
+    get_campaign_by_id,
+    get_campaign_by_name,
+    list_campaigns,
+    update_campaign as update_campaign_service,
+)
 from src.api.service.messages import create_messages
 from src.domain.models import Campaign
 from src.infrastructure.file_readers.factory import get_reader
@@ -22,17 +29,17 @@ def create_campaign_with_file(
         campaign = create_campaign(db, CampaignCreate(name=name))
         db.flush()
 
-        # If there's no file, just commit and return
+        # If there's no file, just commit and return with empty summary
         if not file:
             db.commit()
-            return {"status": "success", "message": f"Campaign '{name}' created without messages."}
+            return campaign, 0, []
 
         # Read file and create messages
         reader = get_reader(file.filename)
         data = reader.read(file)
 
         created = 0
-        invalid_rows = []
+        invalid_rows: list[dict[str, object]] = []
         for idx, row in enumerate(data, start=1):
             # support multiple common header names
             recipient = (
@@ -54,12 +61,7 @@ def create_campaign_with_file(
             created += 1
 
         db.commit()
-        return {
-            "status": "success",
-            "message": f"Campaign '{name}' created with {created} messages.",
-            "created_messages": created,
-            "invalid_rows": invalid_rows,
-        }
+        return campaign, created, invalid_rows
     
     except Exception as e:
         db.rollback()
@@ -94,18 +96,12 @@ def get_campaign(campaign_id: int, db: Session):
     except Exception as e:
         raise e
 
-def update_campaign(campaign_id: int, payload: Campaign, db: Session):
+def update_campaign(campaign_id: int, payload: CampaignUpdate, db: Session):
     campaign = get_campaign_by_id(db, campaign_id)
     if not campaign:
         raise ValueError("Campaign not found")
 
-    for key, value in payload.__dict__.items():
-        if key != "id":
-            setattr(campaign, key, value)
-
-    db.commit()
-    db.refresh(campaign)
-    return campaign
+    return update_campaign_service(db, campaign, payload)
 
 def remove_campaign(campaign_id: int, db: Session):
     campaign = get_campaign_by_id(db, campaign_id)

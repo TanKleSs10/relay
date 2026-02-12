@@ -7,7 +7,7 @@ from src.application.usecases.campaign_usecases import (
     remove_campaign,
     )
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
-from src.api.schemas.campaigns import CampaignRead, CampaignUpdate, CampaignCreate
+from src.api.schemas.campaigns import CampaignRead, CampaignUpdate, CampaignCreate, CampaignUploadSummary
 from sqlalchemy.orm import Session
 from src.api.routes.deps import get_db
 
@@ -15,7 +15,7 @@ from src.api.routes.deps import get_db
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
 
-@router.post("", response_model=CampaignRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=CampaignUploadSummary, status_code=status.HTTP_201_CREATED)
 def create(
     payload: CampaignCreate | None = None,
     name: str | None = Form(None),
@@ -35,7 +35,12 @@ def create(
             if not campaign_name:
                 raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Missing 'name' for file upload")
 
-            return create_campaign_with_file(campaign_name, file, db)
+            campaign, created_messages, invalid_rows = create_campaign_with_file(campaign_name, file, db)
+            return {
+                "campaign": campaign,
+                "created_messages": created_messages,
+                "invalid_rows": invalid_rows,
+            }
 
         # No file: accept name from JSON body or form-urlencoded
         if payload is None and not name:
@@ -44,7 +49,12 @@ def create(
         if payload is None:
             payload = CampaignCreate(name=name)
 
-        return create_campaigns(db, payload)
+        campaign = create_campaigns(db, payload)
+        return {
+            "campaign": campaign,
+            "created_messages": 0,
+            "invalid_rows": [],
+        }
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

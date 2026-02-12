@@ -26,3 +26,9 @@ class CampaignRead(CampaignBase):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CampaignUploadSummary(BaseModel):
+    campaign: CampaignRead
+    created_messages: int
+    invalid_rows: list[dict[str, object]]
