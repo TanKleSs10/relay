@@ -54,8 +54,7 @@ class Campaign(Base):
     __tablename__ = "campaigns"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    message_template: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     status: Mapped[CampaignStatus] = mapped_column(
         SAEnum(CampaignStatus, name="campaign_status"),
         nullable=False,

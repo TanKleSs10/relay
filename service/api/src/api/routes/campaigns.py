@@ -1,60 +1,107 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
-
-from src.api.routes.deps import get_db
-from src.api.schemas.campaigns import CampaignCreate, CampaignRead, CampaignUpdate
-from src.api.service.campaigns import (
-    create_campaign,
-    delete_campaign,
-    get_campaign,
-    list_campaigns,
+from src.application.usecases.campaign_usecases import (
+    create_campaign_with_file,
+    create_campaigns,
+    get_campaign, 
+    get_campaigns, 
     update_campaign,
-)
+    remove_campaign,
+    )
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from src.api.schemas.campaigns import CampaignRead, CampaignUpdate, CampaignCreate
+from sqlalchemy.orm import Session
+from src.api.routes.deps import get_db
+
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
 
 @router.post("", response_model=CampaignRead, status_code=status.HTTP_201_CREATED)
-def create(payload: CampaignCreate, db: Session = Depends(get_db)):
-    return create_campaign(db, payload)
+def create(
+    payload: CampaignCreate | None = None,
+    name: str | None = Form(None),
+    file: UploadFile | None = File(None),
+    db: Session = Depends(get_db)
+    ):
+    try:
+        # If a file is provided, create campaign and messages from file
+        if file:
+            # Determine name from JSON body or form
+            campaign_name = None
+            if payload is not None:
+                campaign_name = payload.name
+            elif name:
+                campaign_name = name
+
+            if not campaign_name:
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Missing 'name' for file upload")
+
+            return create_campaign_with_file(campaign_name, file, db)
+
+        # No file: accept name from JSON body or form-urlencoded
+        if payload is None and not name:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Missing 'name' in request")
+
+        if payload is None:
+            payload = CampaignCreate(name=name)
+
+        return create_campaigns(db, payload)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 
 
 @router.get("", response_model=list[CampaignRead])
 def list_items(
-    db: Session = Depends(get_db),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500),
-):
-    return list_campaigns(db, skip=skip, limit=limit)
+    db: Session = Depends(get_db)
+    ):
+    try:
+        return get_campaigns(db)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 
 
 @router.get("/{campaign_id}", response_model=CampaignRead)
 def get_item(campaign_id: int, db: Session = Depends(get_db)):
-    campaign = get_campaign(db, campaign_id)
-    if not campaign:
+    try:
+        return get_campaign(campaign_id, db)
+    except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
         )
-    return campaign
 
 
 @router.patch("/{campaign_id}", response_model=CampaignRead)
 def update_item(
     campaign_id: int, payload: CampaignUpdate, db: Session = Depends(get_db)
-):
-    campaign = get_campaign(db, campaign_id)
-    if not campaign:
+    ):
+    try:
+        return update_campaign(campaign_id, payload, db)
+    except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
         )
-    return update_campaign(db, campaign, payload)
 
-
-@router.delete("/{campaign_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{campaign_id}", status_code=status.HTTP_200_OK)
 def delete_item(campaign_id: int, db: Session = Depends(get_db)):
-    campaign = get_campaign(db, campaign_id)
-    if not campaign:
+    try:
+        remove_campaign(campaign_id, db)
+        return {"detail": "Campaign deleted successfully"}
+    except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
         )
-    delete_campaign(db, campaign)

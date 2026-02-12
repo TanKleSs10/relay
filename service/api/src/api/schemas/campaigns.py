@@ -9,7 +9,6 @@ from src.domain import CampaignStatus
 
 class CampaignBase(BaseModel):
     name: str = Field(..., max_length=255)
-    message_template: str
 
 
 class CampaignCreate(CampaignBase):
@@ -18,7 +17,6 @@ class CampaignCreate(CampaignBase):
 
 class CampaignUpdate(BaseModel):
     name: str | None = Field(default=None, max_length=255)
-    message_template: str | None = None
     status: CampaignStatus | None = None
 
 

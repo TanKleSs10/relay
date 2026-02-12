@@ -8,7 +8,7 @@ from src.api.routes.campaigns import router as campaigns_router
 from src.api.routes.health import router as health_router
 from src.api.routes.view import router as view_router
 from src.config import get_settings
-from src.domain import models  # noqa: F401
+from src.domain import models
 from src.infrastructure.db.base import Base
 from src.infrastructure.db.session import engine
 
