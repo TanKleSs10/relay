@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crear Campaña | Relay</title>
+  <link rel="stylesheet" href="/statics/css/styles.css">
+</head>
+
+<body>
+  <header class="header">
+    <div class="header__container">
+      <h1 class="header__title">⚡ Relay</h1>
+    </div>
+  </header>
+  <main class="container">
+    <section class="actions">
+      <a class="btn btn--primary" href="/">Volver al Panel</a>
+    </section>
+    <section class="campaign-form">
+      <h2 class="actions__title">Crear nueva campaña</h2>
+      <form class="campaign-form__form" method="post" enctype="multipart/form-data">
+        <div class="campaign-form__group">
+          <label for="name" class="campaign-form__label">Nombre de la campaña</label>
+          <input type="text" id="name" name="name" class="campaign-form__input" placeholder="Ej: Promoción Primavera"
+            required>
+        </div>
+        <div class="campaign-form__group">
+          <label for="file" class="campaign-form__label">Archivo CSV <span class="campaign-form__hint">(Campos:
+              phone_number, message)</span></label>
+          <input type="file" id="file" name="file" class="campaign-form__input" accept=".csv" required>
+        </div>
+        <div class="campaign-form__actions">
+          <button type="submit" class="btn btn--primary">Crear campaña</button>
+        </div>
+      </form>
+    </section>
+  </main>
+  <style>
+    .campaign-form {
+      max-width: 480px;
+      margin: 2rem auto;
+      background: var(--color-card-bg);
+      border-radius: 8px;
+      box-shadow: var(--color-card-shadow);
+      padding: 2rem 1.5rem;
+    }
+
+    .campaign-form__form {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    .campaign-form__group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .campaign-form__label {
+      color: var(--color-card-meta-label);
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .campaign-form__hint {
+      font-size: 0.85rem;
+      color: var(--color-card-meta-label);
+      font-weight: 400;
+    }
+
+    .campaign-form__input {
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      border: 1px solid var(--color-card-header-border);
+      background: var(--color-card-header-bg);
+      color: var(--color-card-name);
+      font-size: 1rem;
+      font-family: inherit;
+    }
+
+    .campaign-form__input[type="file"] {
+      padding: 0.5rem 0;
+      color-scheme: dark;
+    }
+
+    .campaign-form__actions {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    @media (max-width: 600px) {
+      .campaign-form {
+        padding: 1rem 0.5rem;
+      }
+    }
+  </style>
+</body>
+
+</html>

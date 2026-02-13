@@ -37,9 +37,10 @@ def create_campaign_with_file(
         # Read file and create messages
         reader = get_reader(file.filename)
         data = reader.read(file)
-
+        print(f"Data read from file: {data}")
         created = 0
         invalid_rows: list[dict[str, object]] = []
+
         for idx, row in enumerate(data, start=1):
             # support multiple common header names
             recipient = (

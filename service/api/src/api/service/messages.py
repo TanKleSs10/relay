@@ -33,6 +33,58 @@ def list_messages(db: Session, skip: int = 0, limit: int = 100) -> list[Message]
     )
 
 
+def list_messages_by_campaign(
+    db: Session, campaign_id: int, skip: int = 0, limit: int = 100
+) -> list[Message]:
+    return (
+        db.query(Message)
+        .filter(Message.campaign_id == campaign_id)
+        .order_by(Message.id.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
+def list_messages_by_status(
+    db: Session, status: MessageStatus, skip: int = 0, limit: int = 100
+) -> list[Message]:
+    return (
+        db.query(Message)
+        .filter(Message.status == status)
+        .order_by(Message.id.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
+def update_message_status(
+    db: Session, message: Message, status: MessageStatus
+) -> Message:
+    message.status = status
+    db.commit()
+    db.refresh(message)
+    return message
+
+
+def update_message_error(
+    db: Session, message: Message, error: str, increment_attempts: bool = True
+) -> Message:
+    message.last_error = error
+    if increment_attempts:
+        message.attempts += 1
+    db.commit()
+    db.refresh(message)
+    return message
+
+
 def delete_message(db: Session, message: Message) -> None:
     db.delete(message)
     db.commit()
+
+
+def delete_messages_by_campaign(db: Session, campaign_id: int) -> int:
+    count = db.query(Message).filter(Message.campaign_id == campaign_id).delete()
+    db.commit()
+    return count

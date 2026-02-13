@@ -8,4 +8,8 @@ templates = Jinja2Templates(directory="src/templates")
 
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    return templates.TemplateResponse("upload.html", {"request": request})
+    return templates.TemplateResponse("panel.html", {"request": request})
+
+@router.get("/create-campaign", response_class=HTMLResponse)
+async def create_campaign(request: Request):
+    return templates.TemplateResponse("createCampaign.html", {"request": request})

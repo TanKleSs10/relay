@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relay - Panel de Control</title>
+    <link rel="stylesheet" href="/statics/css/styles.css">
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header__container">
+            <h1 class="header__title">⚡ Relay</h1>
+        </div>
+    </header>
+
+    <!-- Contenido principal -->
+    <main class="container">
+        <!-- Sección de acciones -->
+        <section class="actions">
+            <h2 class="actions__title">Acciones</h2>
+            <div class="actions__group">
+                <button class="btn btn--primary">
+                    ⚙️ Administrar Canales
+                </button>
+                <button class="btn btn--secondary">
+                    ➕ Crear Canal WhatsApp
+                </button>
+                <a href="/create-campaign">
+                    <button class="btn btn--tertiary">
+                        📧 Crear Campaña
+                    </button>
+                </a>
+            </div>
+        </section>
+
+        <!-- Sección de campañas -->
+        <section class="campaigns">
+            <h2 class="campaigns__title">Campaña Activas</h2>
+
+            <!-- Grid de campañas -->
+            <div class="campaigns__grid">
+                <!-- Card de campaña 1 -->
+                <div class="campaign-card">
+                    <div class="campaign-card__header">
+                        <h3 class="campaign-card__name">Oferta Black Friday</h3>
+                    </div>
+                    <div class="campaign-card__body">
+                        <div class="campaign-card__meta">
+                            <div class="campaign-card__meta-item">
+                                <span class="campaign-card__meta-label">Mensajes</span>
+                                <span class="campaign-card__meta-value">245</span>
+                            </div>
+                            <div class="campaign-card__meta-item">
+                                <span class="campaign-card__meta-label">Estado</span>
+                                <span class="campaign-card__status campaign-card__status--processing">Procesando</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="campaign-card__footer">
+                        <button class="campaign-card__button">Enviar Campaña</button>
+                    </div>
+                </div>
+
+                <!-- Card de campaña 2 -->
+                <div class="campaign-card">
+                    <div class="campaign-card__header">
+                        <h3 class="campaign-card__name">Confirmación de Pedido</h3>
+                    </div>
+                    <div class="campaign-card__body">
+                        <div class="campaign-card__meta">
+                            <div class="campaign-card__meta-item">
+                                <span class="campaign-card__meta-label">Mensajes</span>
+                                <span class="campaign-card__meta-value">1,230</span>
+                            </div>
+                            <div class="campaign-card__meta-item">
+                                <span class="campaign-card__meta-label">Estado</span>
+                                <span class="campaign-card__status campaign-card__status--done">Completado</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="campaign-card__footer">
+                        <button class="campaign-card__button">Enviar Campaña</button>
+                    </div>
+                </div>
+
+                <!-- Card de campaña 3 -->
+                <div class="campaign-card">
+                    <div class="campaign-card__header">
+                        <h3 class="campaign-card__name">Recordatorio de Compra</h3>
+                    </div>
+                    <div class="campaign-card__body">
+                        <div class="campaign-card__meta">
+                            <div class="campaign-card__meta-item">
+                                <span class="campaign-card__meta-label">Mensajes</span>
+                                <span class="campaign-card__meta-value">567</span>
+                            </div>
+                            <div class="campaign-card__meta-item">
+                                <span class="campaign-card__meta-label">Estado</span>
+                                <span class="campaign-card__status campaign-card__status--queued">En Cola</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="campaign-card__footer">
+                        <button class="campaign-card__button">Enviar Campaña</button>
+                    </div>
+                </div>
+
+                <!-- Card de campaña 4 -->
+                <div class="campaign-card">
+                    <div class="campaign-card__header">
+                        <h3 class="campaign-card__name">Lanzamiento de Producto</h3>
+                    </div>
+                    <div class="campaign-card__body">
+                        <div class="campaign-card__meta">
+                            <div class="campaign-card__meta-item">
+                                <span class="campaign-card__meta-label">Mensajes</span>
+                                <span class="campaign-card__meta-value">89</span>
+                            </div>
+                            <div class="campaign-card__meta-item">
+                                <span class="campaign-card__meta-label">Estado</span>
+                                <span class="campaign-card__status campaign-card__status--created">Creado</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="campaign-card__footer">
+                        <button class="campaign-card__button">Enviar Campaña</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estado vacío (descomentar si no hay campañas) -->
+            <!-- 
+            <div class="empty-state">
+                <div class="empty-state__icon">📭</div>
+                <h3 class="empty-state__title">Sin Campañas</h3>
+                <p class="empty-state__text">No tienes campañas creadas. Crea una nueva para comenzar.</p>
+                <button class="btn btn--tertiary">Crear Primera Campaña</button>
+            </div>
+            -->
+        </section>
+    </main>
+</body>
+
+</html>
