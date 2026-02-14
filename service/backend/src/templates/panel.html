@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relay - Panel de Control</title>
+    <link rel="stylesheet" href="/statics/css/styles.css">
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header__container">
+            <h1 class="header__title">⚡ Relay</h1>
+        </div>
+    </header>
+
+    <!-- Contenido principal -->
+    <main class="container">
+        <!-- Sección de acciones -->
+        <section class="actions">
+            <h2 class="actions__title">Acciones</h2>
+            <div class="actions__group">
+                <button class="btn btn--primary">
+                    ⚙️ Administrar Canales
+                </button>
+                <button id="btn-wa" class="btn btn--success">
+                    ➕ Crear Canal WhatsApp
+                </button>
+                <a href="/create-campaign">
+                    <button class="btn btn--tertiary">
+                        📧 Crear Campaña
+                    </button>
+                </a>
+            </div>
+        </section>
+
+        <!-- Sección de campañas -->
+        <section class="campaigns">
+            <h2 class="campaigns__title">Campaña Activas</h2>
+
+            <!-- Grid de campañas -->
+            <div id="campaigns-container" class="campaigns__grid">
+                <!-- Las tarjetas de campaña se cargarán aquí dinámicamente -->
+            </div>
+        </section>
+    </main>
+</body>
+<script type="module" src="/statics/js/app.js"></script>
+
+</html>

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestionar Campaña</title>
+    <link rel="stylesheet" href="/statics/css/styles.css">
+</head>
+
+<body>
+    <header class="header">
+        <div class="header__container">
+            <h1 class="header__title">⚡ Relay</h1>
+        </div>
+    </header>
+    <main class="container">
+        <section class="actions">
+            <a href="/" class="btn btn--secondary">← Volver al Panel</a>
+        </section>
+        <section class="campaign-detail">
+            <h2 class="campaigns__title" id="campaign-title">Gestionar Campaña</h2>
+            <div id="campaign-info" style="margin-bottom:2rem;"></div>
+            <div class="actions__group" style="margin-bottom:2rem;">
+                <button id="delete-campaign" class="btn btn--danger">Eliminar Campaña</button>
+            </div>
+            <h3 class="campaigns__title">Mensajes</h3>
+            <div id="messages-list" class=""></div>
+            <div style="margin-top:2rem;">
+                <a id="add-message" class="btn btn--success" href="/message-form?campaign={{ campaign_id }}">Agregar
+                    Mensaje</a>
+            </div>
+        </section>
+    </main>
+    <script type="module" src="/statics/js/manageCampaign.js"></script>
+</body>
+
+</html>
