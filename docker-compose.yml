@@ -1,14 +1,14 @@
 services:
   api:
     build:
-      context: ./service/api
+      context: ./service/backend
       dockerfile: Dockerfile.api
     ports:
       - "8000:8000"
     env_file:
       - .env
     volumes:
-      - ./service/api:/app
+      - ./service/backend:/app
     depends_on:
       - db
     networks:
@@ -27,8 +27,22 @@ services:
     networks:
       - relay-network
 
+  whatsapp-worker:
+    build:
+      context: ./service/workers/whatsapp
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    volumes:
+      - whatsapp_auth:/app/.wwebjs_auth
+    depends_on:
+      - db
+    networks:
+      - relay-network
+
 volumes:
   postgres_data:
+  whatsapp_auth:
 
 networks:
   relay-network:
