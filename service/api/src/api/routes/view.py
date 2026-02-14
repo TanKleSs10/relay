@@ -13,3 +13,11 @@ async def home(request: Request):
 @router.get("/create-campaign", response_class=HTMLResponse)
 async def create_campaign(request: Request):
     return templates.TemplateResponse("createCampaign.html", {"request": request})
+
+@router.get("/manage-campaign/{campaign_id}", response_class=HTMLResponse)
+async def manage_campaign(request: Request, campaign_id: str):
+    return templates.TemplateResponse("manageCampaign.html", {"request": request, "campaign_id": campaign_id})
+
+@router.get("/message-form", response_class=HTMLResponse)
+async def message_form(request: Request):
+    return templates.TemplateResponse("messageForm.html", {"request": request})

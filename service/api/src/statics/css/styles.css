@@ -1,3 +1,13 @@
+/* Utilidad: centrar texto en celdas */
+.u-text-center {
+    text-align: center !important;
+}
+
+/* Utilidad: ancho 100% */
+.u-w-100 {
+    width: 100% !important;
+}
+
 /* Panel-specific styles (BEM) - responsive and mobile-friendly */
 :root {
     --color-bg-main: #181a20;
@@ -8,9 +18,15 @@
     --color-btn-primary: #667eea;
     --color-btn-primary-hover: #5568d3;
     --color-btn-primary-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-    --color-btn-secondary: #48bb78;
-    --color-btn-secondary-hover: #38a169;
-    --color-btn-secondary-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
+    --color-btn-secondary: #6c757d;
+    --color-btn-secondary-hover: #495057;
+    --color-btn-secondary-shadow: 0 4px 12px rgba(108, 117, 125, 0.4);
+    --color-btn-success: #48bb78;
+    --color-btn-success-hover: #38a169;
+    --color-btn-success-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
+    --color-btn-danger: #ff6b6b;
+    --color-btn-danger-hover: #e53e3e;
+    --color-btn-danger-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
     --color-btn-tertiary: #ed8936;
     --color-btn-tertiary-hover: #dd6b20;
     --color-btn-tertiary-shadow: 0 4px 12px rgba(237, 137, 54, 0.4);
@@ -48,6 +64,11 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     background-color: var(--color-bg-main);
     color: var(--color-text-main);
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
 }
 
 /* Header */
@@ -121,6 +142,7 @@ body {
     box-shadow: var(--color-btn-primary-shadow);
 }
 
+
 .btn--secondary {
     background-color: var(--color-btn-secondary);
     color: white;
@@ -129,6 +151,26 @@ body {
 .btn--secondary:hover {
     background-color: var(--color-btn-secondary-hover);
     box-shadow: var(--color-btn-secondary-shadow);
+}
+
+.btn--success {
+    background-color: var(--color-btn-success);
+    color: white;
+}
+
+.btn--success:hover {
+    background-color: var(--color-btn-success-hover);
+    box-shadow: var(--color-btn-success-shadow);
+}
+
+.btn--danger {
+    background-color: var(--color-btn-danger);
+    color: white;
+}
+
+.btn--danger:hover {
+    background-color: var(--color-btn-danger-hover);
+    box-shadow: var(--color-btn-danger-shadow);
 }
 
 .btn--tertiary {
@@ -162,6 +204,7 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 1.5rem;
+    min-height: 300px;
 }
 
 /* Card de campaña */
@@ -262,9 +305,11 @@ body {
 }
 
 .campaign-card__button {
+    display: flex;
+    text-align: center;
+    flex-direction: column;
     width: 100%;
     padding: 0.75rem;
-    background-color: var(--color-btn-primary);
     color: white;
     border: none;
     border-radius: 6px;
@@ -274,16 +319,20 @@ body {
     transition: all 0.3s ease;
 }
 
-.campaign-card__button:hover {
-    background-color: var(--color-btn-primary-hover);
-    box-shadow: var(--color-btn-primary-shadow);
-}
-
 /* Estado vacío */
 .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     text-align: center;
     padding: 3rem 1rem;
     color: var(--color-empty-state);
+    width: 100%;
+    height: 100%;
+    min-height: 300px;
+    grid-column: 1 / -1;
+    grid-row: 1 / -1;
 }
 
 .empty-state__icon {

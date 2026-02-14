@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from sqlalchemy.orm import Session
+
+from sqlalchemy.orm import Session, joinedload
 
 from src.api.schemas.campaigns import CampaignCreate, CampaignUpdate
 from src.domain import Campaign, CampaignStatus
@@ -18,11 +19,12 @@ def get_campaign_by_name(db: Session, name: str) -> Campaign | None:
     return db.query(Campaign).filter(Campaign.name == name).first()
 
 def get_campaign_by_id(db: Session, campaign_id: int) -> Campaign | None:
-    return db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    return db.query(Campaign).options(joinedload(Campaign.messages)).filter(Campaign.id == campaign_id).first()
 
 def list_campaigns(db: Session, skip: int = 0, limit: int = 100) -> list[Campaign]:
     return (
         db.query(Campaign)
+        .options(joinedload(Campaign.messages))
         .order_by(Campaign.id.desc())
         .offset(skip)
         .limit(limit)

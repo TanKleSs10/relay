@@ -20,10 +20,14 @@ class CampaignUpdate(BaseModel):
     status: CampaignStatus | None = None
 
 
+
+from src.api.schemas.messages import MessageRead
+
 class CampaignRead(CampaignBase):
     id: int
     status: CampaignStatus
     created_at: datetime
+    messages: list[MessageRead] = []
 
     model_config = ConfigDict(from_attributes=True)
 
