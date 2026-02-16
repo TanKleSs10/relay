@@ -7,6 +7,7 @@ from fastapi.templating import Jinja2Templates
 from src.api.routes.campaigns import router as campaigns_router
 from src.api.routes.health import router as health_router
 from src.api.routes.messages import router as messages_router
+from src.api.routes.sender_accounts import router as sender_accounts_router
 from src.api.routes.view import router as view_router
 from src.config import get_settings
 from src.domain import models
@@ -29,6 +30,7 @@ app.include_router(health_router)
 app.include_router(view_router)
 app.include_router(campaigns_router)
 app.include_router(messages_router)
+app.include_router(sender_accounts_router)
 
 
 @app.on_event("startup")

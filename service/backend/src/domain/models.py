@@ -19,7 +19,7 @@ from src.infrastructure.db.base import Base
 
 
 class Provider(str, Enum):
-    WHATSAPP_WEB = "whatsapp_web"
+    WHATSAPP_WEB = "whatsapp-web"
 
 
 class CampaignStatus(str, Enum):
@@ -38,10 +38,11 @@ class MessageStatus(str, Enum):
 
 
 class SenderAccountStatus(str, Enum):
-    QR_REQUIRED = "QR_REQUIRED"
+    CREATED = "CREATED"
+    WAITING_QR = "WAITING_QR"
     READY = "READY"
+    DISCONNECTED = "DISCONNECTED"
     BLOCKED = "BLOCKED"
-    COOLDOWN = "COOLDOWN"
 
 
 class WorkerStatus(str, Enum):
@@ -108,15 +109,25 @@ class SenderAccount(Base):
         nullable=False,
         default=Provider.WHATSAPP_WEB,
     )
-    phone_number: Mapped[str] = mapped_column(String(50), nullable=False)
+    phone_number: Mapped[str | None] = mapped_column(String(50))
     status: Mapped[SenderAccountStatus] = mapped_column(
         SAEnum(SenderAccountStatus, name="sender_account_status"),
         nullable=False,
-        default=SenderAccountStatus.QR_REQUIRED,
+        default=SenderAccountStatus.CREATED,
     )
+    qr_code: Mapped[str | None] = mapped_column(Text)
+    session_id: Mapped[str | None] = mapped_column(String(255))
+    messages_sent_hour: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_qr_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
     )
 
     send_logs: Mapped[list[SendLog]] = relationship(

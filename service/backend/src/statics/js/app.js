@@ -12,6 +12,73 @@ const btnWA = document.querySelector("#btn-wa");
 const campaignsGrid = document.querySelector("#campaigns-container");
 let campaigns = [];
 
+function ensureQrModal() {
+  let modal = document.getElementById("qr-modal");
+  if (modal) return modal;
+  modal = document.createElement("div");
+  modal.id = "qr-modal";
+  modal.style.position = "fixed";
+  modal.style.inset = "0";
+  modal.style.background = "rgba(0,0,0,0.7)";
+  modal.style.display = "none";
+  modal.style.alignItems = "center";
+  modal.style.justifyContent = "center";
+  modal.style.zIndex = "9999";
+  modal.innerHTML = `
+    <div style="background:#111;padding:24px;border-radius:8px;max-width:320px;width:90%;text-align:center;">
+      <h3 style="margin-bottom:12px;">Escanea el QR</h3>
+      <img id="qr-image" alt="QR" style="width:100%;height:auto;border-radius:6px;" />
+      <p id="qr-status" style="margin-top:12px;font-size:0.9rem;color:#ccc;"></p>
+      <button id="qr-close" class="btn btn--secondary" style="margin-top:16px;">Cerrar</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.querySelector("#qr-close").onclick = () => {
+    modal.style.display = "none";
+  };
+  return modal;
+}
+
+async function createSenderAccount() {
+  const res = await fetch("/sender-accounts", { method: "POST" });
+  if (!res.ok) throw new Error("No se pudo crear el canal");
+  return await res.json();
+}
+
+async function fetchSenderAccount(id) {
+  const res = await fetch(`/sender-accounts/${id}`);
+  if (!res.ok) throw new Error("No se pudo consultar el canal");
+  return await res.json();
+}
+
+async function pollQr(senderId) {
+  const modal = ensureQrModal();
+  const qrImage = modal.querySelector("#qr-image");
+  const qrStatus = modal.querySelector("#qr-status");
+  modal.style.display = "flex";
+  qrStatus.textContent = "Esperando QR...";
+
+  const interval = setInterval(async () => {
+    try {
+      const sender = await fetchSenderAccount(senderId);
+      if (sender.status === "WAITING_QR" && sender.qr_code) {
+        qrImage.src = sender.qr_code;
+        qrStatus.textContent = "Escanea el QR con WhatsApp.";
+      }
+      if (sender.status === "READY") {
+        qrStatus.textContent = `Canal listo: ${sender.phone_number || ""}`;
+        setTimeout(() => {
+          modal.style.display = "none";
+        }, 1200);
+        clearInterval(interval);
+      }
+    } catch (error) {
+      clearInterval(interval);
+      qrStatus.textContent = "Error al consultar el canal.";
+    }
+  }, 2000);
+}
+
 
 const notCampaignsHTML = `
 	<div class="empty-state">
@@ -82,6 +149,15 @@ async function updateCampaignsView() {
 }
 
 updateCampaignsView();
+
+btnWA.addEventListener("click", async () => {
+  try {
+    const data = await createSenderAccount();
+    await pollQr(data.id);
+  } catch (error) {
+    alert("No se pudo crear el canal.");
+  }
+});
 
 const deleteCampaign = async (id) => {
   try {
