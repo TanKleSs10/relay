@@ -21,3 +21,8 @@ async def manage_campaign(request: Request, campaign_id: str):
 @router.get("/message-form", response_class=HTMLResponse)
 async def message_form(request: Request):
     return templates.TemplateResponse("messageForm.html", {"request": request})
+
+
+@router.get("/manage-channels", response_class=HTMLResponse)
+async def manage_channels(request: Request):
+    return templates.TemplateResponse("manageChannels.html", {"request": request})

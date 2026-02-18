@@ -16,6 +16,10 @@ def get_sender_accounts_by_status(
     )
 
 
+def list_sender_accounts(db: Session) -> list[SenderAccount]:
+    return db.query(SenderAccount).order_by(SenderAccount.created_at.desc()).all()
+
+
 def create_sender_account(
     db: Session, payload: SenderAccountCreate | None = None
 ) -> SenderAccount:
@@ -24,7 +28,7 @@ def create_sender_account(
         provider = payload.provider
     sender = SenderAccount(
         provider=provider,
-        status=SenderAccountStatus.CREATED,
+        status=SenderAccountStatus.WAITING_QR,
         phone_number=None,
         qr_code=None,
         session_id=None,
@@ -37,6 +41,11 @@ def create_sender_account(
 
 def get_sender_account_by_id(db: Session, sender_id: int) -> SenderAccount | None:
     return db.query(SenderAccount).filter(SenderAccount.id == sender_id).first()
+
+
+def delete_sender_account(db: Session, sender: SenderAccount) -> None:
+    db.delete(sender)
+    db.commit()
 
 
 def update_sender_account(

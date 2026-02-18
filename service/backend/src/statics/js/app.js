@@ -10,6 +10,7 @@ const statusTranslator = {
 // Define constats and variables
 const btnWA = document.querySelector("#btn-wa");
 const campaignsGrid = document.querySelector("#campaigns-container");
+const activeWorkersCount = document.querySelector("#active-workers-count");
 let campaigns = [];
 
 function ensureQrModal() {
@@ -148,16 +149,36 @@ async function updateCampaignsView() {
   renderCampaigns(campaigns);
 }
 
-updateCampaignsView();
+async function fetchActiveWorkersCount() {
+  const response = await fetch("/workers/active-count");
+  if (!response.ok) throw new Error("No se pudo consultar workers activos");
+  return await response.json();
+}
 
-btnWA.addEventListener("click", async () => {
+async function updateActiveWorkersView() {
+  if (!activeWorkersCount) return;
   try {
-    const data = await createSenderAccount();
-    await pollQr(data.id);
+    const data = await fetchActiveWorkersCount();
+    activeWorkersCount.textContent = String(data.active_workers ?? 0);
   } catch (error) {
-    alert("No se pudo crear el canal.");
+    activeWorkersCount.textContent = "-";
   }
-});
+}
+
+updateCampaignsView();
+updateActiveWorkersView();
+setInterval(updateActiveWorkersView, 5000);
+
+if (btnWA) {
+  btnWA.addEventListener("click", async () => {
+    try {
+      const data = await createSenderAccount();
+      await pollQr(data.id);
+    } catch (error) {
+      alert("No se pudo crear el canal.");
+    }
+  });
+}
 
 const deleteCampaign = async (id) => {
   try {
