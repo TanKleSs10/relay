@@ -19,7 +19,7 @@ from src.infrastructure.db.base import Base
 
 
 class Provider(str, Enum):
-    WHATSAPP_WEB = "whatsapp-web"
+    WHATSAPP_WEB = "WHATSAPP_WEB"
 
 
 class CampaignStatus(str, Enum):
@@ -38,10 +38,9 @@ class MessageStatus(str, Enum):
 
 
 class SenderAccountStatus(str, Enum):
-    CREATED = "CREATED"
-    WAITING_QR = "WAITING_QR"
+    QR_REQUIRED = "QR_REQUIRED"
     READY = "READY"
-    DISCONNECTED = "DISCONNECTED"
+    COOLDOWN = "COOLDOWN"
     BLOCKED = "BLOCKED"
 
 
@@ -113,7 +112,7 @@ class SenderAccount(Base):
     status: Mapped[SenderAccountStatus] = mapped_column(
         SAEnum(SenderAccountStatus, name="sender_account_status"),
         nullable=False,
-        default=SenderAccountStatus.CREATED,
+        default=SenderAccountStatus.QR_REQUIRED,
     )
     qr_code: Mapped[str | None] = mapped_column(Text)
     session_id: Mapped[str | None] = mapped_column(String(255))

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from src.api.routes.deps import get_db
@@ -16,13 +16,7 @@ router = APIRouter(prefix="/messages", tags=["messages"])
 
 @router.post("", response_model=MessageRead, status_code=status.HTTP_201_CREATED)
 def create(payload: MessageCreate, db: Session = Depends(get_db)):
-    try:
-        return create_message(db, payload)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+    return create_message(db, payload)
 
 
 @router.get("", response_model=list[MessageRead])
@@ -32,25 +26,13 @@ def list_items(db: Session = Depends(get_db)):
 
 @router.get("/{message_id}", response_model=MessageRead)
 def get_item(message_id: int, db: Session = Depends(get_db)):
-    try:
-        return get_message(message_id, db)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+    return get_message(message_id, db)
 
 
 @router.delete("/{message_id}", status_code=status.HTTP_200_OK)
 def delete_item(message_id: int, db: Session = Depends(get_db)):
-    try:
-        remove_message(message_id, db)
-        return {"detail": "Message deleted successfully"}
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+    remove_message(message_id, db)
+    return {"detail": "Message deleted successfully"}
 
 
 @router.patch("/{message_id}", response_model=MessageRead)
@@ -59,10 +41,4 @@ def update_item(
     payload: MessageUpdate,
     db: Session = Depends(get_db)
 ):
-    try:
-        return update_message_item(message_id, payload, db)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+    return update_message_item(message_id, payload, db)

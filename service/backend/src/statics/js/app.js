@@ -1,11 +1,27 @@
 // Traductor de estados y clases
-const statusTranslator = {
+const campaignStatusMeta = {
   CREATED: { label: "Creada", class: "campaign-card__status--created" },
   QUEUED: { label: "En cola", class: "campaign-card__status--queued" },
   PROCESSING: { label: "Procesando", class: "campaign-card__status--processing" },
   DONE: { label: "Finalizada", class: "campaign-card__status--done" },
   FAILED: { label: "Fallida", class: "campaign-card__status--failed" }
 };
+let statusTranslator = {};
+
+async function fetchEnumIndex() {
+  const response = await fetch("/metadata/enums");
+  if (!response.ok) throw new Error("No se pudieron cargar enums");
+  return await response.json();
+}
+
+function buildCampaignStatusTranslator(enumIndex) {
+  const statuses = enumIndex?.enums?.campaign_status || Object.keys(campaignStatusMeta);
+  const translator = {};
+  statuses.forEach((status) => {
+    translator[status] = campaignStatusMeta[status] || { label: status, class: "" };
+  });
+  return translator;
+}
 
 // Define constats and variables
 const btnWA = document.querySelector("#btn-wa");
@@ -62,7 +78,7 @@ async function pollQr(senderId) {
   const interval = setInterval(async () => {
     try {
       const sender = await fetchSenderAccount(senderId);
-      if (sender.status === "WAITING_QR" && sender.qr_code) {
+      if (sender.status === "QR_REQUIRED" && sender.qr_code) {
         qrImage.src = sender.qr_code;
         qrStatus.textContent = "Escanea el QR con WhatsApp.";
       }
@@ -165,9 +181,19 @@ async function updateActiveWorkersView() {
   }
 }
 
-updateCampaignsView();
-updateActiveWorkersView();
-setInterval(updateActiveWorkersView, 5000);
+async function initDashboard() {
+  try {
+    const enumIndex = await fetchEnumIndex();
+    statusTranslator = buildCampaignStatusTranslator(enumIndex);
+  } catch (error) {
+    statusTranslator = buildCampaignStatusTranslator(null);
+  }
+  updateCampaignsView();
+  updateActiveWorkersView();
+  setInterval(updateActiveWorkersView, 5000);
+}
+
+initDashboard();
 
 if (btnWA) {
   btnWA.addEventListener("click", async () => {

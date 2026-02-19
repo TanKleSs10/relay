@@ -37,11 +37,8 @@ def update_campaign(
     updates = payload.model_dump(exclude_unset=True)
     for field, value in updates.items():
         setattr(campaign, field, value)
-    db.commit()
-    db.refresh(campaign)
     return campaign
 
 
 def delete_campaign(db: Session, campaign: Campaign) -> None:
     db.delete(campaign)
-    db.commit()

@@ -5,13 +5,29 @@ const qrImage = document.getElementById("qr-image");
 const qrText = document.getElementById("qr-text");
 const closeQrBtn = document.getElementById("close-qr-btn");
 
-const senderStatusTranslator = {
-  CREATED: "Creado",
-  WAITING_QR: "Esperando QR",
+const senderStatusLabels = {
+  QR_REQUIRED: "Esperando QR",
   READY: "Listo",
-  DISCONNECTED: "Desconectado",
+  COOLDOWN: "En enfriamiento",
   BLOCKED: "Bloqueado"
 };
+
+let senderStatusTranslator = {};
+
+async function fetchEnumIndex() {
+  const response = await fetch("/metadata/enums");
+  if (!response.ok) throw new Error("No se pudieron cargar enums");
+  return await response.json();
+}
+
+function buildSenderStatusTranslator(enumIndex) {
+  const statuses = enumIndex?.enums?.sender_account_status || Object.keys(senderStatusLabels);
+  const translator = {};
+  statuses.forEach((status) => {
+    translator[status] = senderStatusLabels[status] || status;
+  });
+  return translator;
+}
 
 const emptyChannelsHTML = `
   <div class="empty-state">
@@ -97,6 +113,14 @@ async function deleteChannel(senderId) {
 
 async function refreshChannels() {
   try {
+    if (!Object.keys(senderStatusTranslator).length) {
+      try {
+        const enumIndex = await fetchEnumIndex();
+        senderStatusTranslator = buildSenderStatusTranslator(enumIndex);
+      } catch (error) {
+        senderStatusTranslator = buildSenderStatusTranslator(null);
+      }
+    }
     const channels = await fetchChannels();
     renderChannels(channels);
   } catch (error) {

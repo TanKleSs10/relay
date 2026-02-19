@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     db_url: str = ""
     sql_echo: bool = False
     log_level: str = "INFO"
+    auto_create_schema: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env",

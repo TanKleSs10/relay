@@ -28,14 +28,12 @@ def create_sender_account(
         provider = payload.provider
     sender = SenderAccount(
         provider=provider,
-        status=SenderAccountStatus.WAITING_QR,
+        status=SenderAccountStatus.QR_REQUIRED,
         phone_number=None,
         qr_code=None,
         session_id=None,
     )
     db.add(sender)
-    db.commit()
-    db.refresh(sender)
     return sender
 
 
@@ -45,7 +43,6 @@ def get_sender_account_by_id(db: Session, sender_id: int) -> SenderAccount | Non
 
 def delete_sender_account(db: Session, sender: SenderAccount) -> None:
     db.delete(sender)
-    db.commit()
 
 
 def update_sender_account(
@@ -54,6 +51,4 @@ def update_sender_account(
     updates = payload.model_dump(exclude_unset=True)
     for field, value in updates.items():
         setattr(sender, field, value)
-    db.commit()
-    db.refresh(sender)
     return sender

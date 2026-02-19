@@ -63,8 +63,6 @@ def update_message_status(
     db: Session, message: Message, status: MessageStatus
 ) -> Message:
     message.status = status
-    db.commit()
-    db.refresh(message)
     return message
 
 
@@ -74,8 +72,6 @@ def update_message_error(
     message.last_error = error
     if increment_attempts:
         message.attempts += 1
-    db.commit()
-    db.refresh(message)
     return message
 
 
@@ -84,17 +80,13 @@ def update_message(db: Session, message: Message, recipient: str | None, payload
         message.recipient = recipient
     if payload is not None:
         message.payload = payload
-    db.commit()
-    db.refresh(message)
     return message
 
 
 def delete_message(db: Session, message: Message) -> None:
     db.delete(message)
-    db.commit()
 
 
 def delete_messages_by_campaign(db: Session, campaign_id: int) -> int:
     count = db.query(Message).filter(Message.campaign_id == campaign_id).delete()
-    db.commit()
     return count
