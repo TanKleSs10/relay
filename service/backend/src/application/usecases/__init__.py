@@ -1,6 +1,7 @@
 from src.application.usecases.campaign_usecases import (
     create_campaign_with_file,
     create_campaigns,
+    dispatch_campaign,
     get_campaign,
     get_campaigns,
     update_campaign,
@@ -17,6 +18,7 @@ from src.application.usecases.sender_account_usecases import (
 __all__ = [
     "create_campaign_with_file",
     "create_campaigns",
+    "dispatch_campaign",
     "get_campaign",
     "get_campaigns",
     "update_campaign",

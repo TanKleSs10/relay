@@ -216,10 +216,28 @@ const deleteCampaign = async (id) => {
   }
 }
 
+const dispatchCampaign = async (id) => {
+  console.log("dispatchCampaign called", id);
+  try {
+    const response = await fetch(`/campaigns/${id}/dispatch`, { method: "POST" });
+    console.log("dispatchCampaign response", response.status);
+    if (!response.ok) throw new Error("Error al enviar campaña");
+    updateCampaignsView();
+  } catch (error) {
+    console.error(error);
+    alert("No se pudo despachar la campaña.");
+  }
+}
+
 campaignsGrid.addEventListener("click", (e) => {
   const target = e.target;
   if (target.id && target.id.startsWith("delete-")) {
     const campaignId = target.id.split("-")[1];
     deleteCampaign(campaignId);
+  }
+  if (target.id && target.id.startsWith("send-")) {
+    const campaignId = target.id.split("-")[1];
+    console.log("send click", campaignId);
+    dispatchCampaign(campaignId);
   }
 });

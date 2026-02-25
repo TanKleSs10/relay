@@ -11,8 +11,10 @@ from src.api.service.campaigns import (
     list_campaigns,
     update_campaign as update_campaign_service,
 )
+from src.api.service.workers import assign_campaign, get_idle_worker
 from src.api.service.messages import create_messages
 from src.domain.models import Campaign
+from src.domain import CampaignStatus
 from src.infrastructure.file_readers.factory import get_reader
 
 
@@ -124,3 +126,24 @@ def remove_campaign(campaign_id: int, db: Session):
         db.rollback()
         raise exc
     return {"status": "success", "message": f"Campaign with id {campaign_id} deleted successfully."}
+
+
+def dispatch_campaign(campaign_id: int, db: Session) -> dict[str, int]:
+    campaign = get_campaign_by_id(db, campaign_id)
+    if not campaign:
+        raise NotFoundError("Campaign not found")
+    if campaign.status == CampaignStatus.PROCESSING:
+        raise ConflictError("Campaign is already processing")
+
+    worker = get_idle_worker(db)
+    if not worker:
+        raise ConflictError("No idle workers available")
+
+    try:
+        campaign.status = CampaignStatus.PROCESSING
+        assign_campaign(db, worker, campaign_id)
+        db.commit()
+        return {"worker_id": worker.id}
+    except Exception as exc:
+        db.rollback()
+        raise exc

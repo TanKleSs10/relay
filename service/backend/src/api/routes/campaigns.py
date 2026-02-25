@@ -1,6 +1,7 @@
 from src.application.usecases.campaign_usecases import (
     create_campaign_with_file,
     create_campaigns,
+    dispatch_campaign,
     get_campaign,
     get_campaigns,
     remove_campaign,
@@ -66,3 +67,8 @@ def update_item(
 def delete_item(campaign_id: int, db: Session = Depends(get_db)):
     remove_campaign(campaign_id, db)
     return {"detail": "Campaign deleted successfully"}
+
+
+@router.post("/{campaign_id}/dispatch", status_code=status.HTTP_202_ACCEPTED)
+def dispatch_item(campaign_id: int, db: Session = Depends(get_db)):
+    return dispatch_campaign(campaign_id, db)
