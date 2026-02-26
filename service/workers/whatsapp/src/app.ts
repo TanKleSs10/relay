@@ -11,7 +11,7 @@ async function boostrap() {
   const pool = await connectDB();
   const workerRepository = new WorkerRepository(pool);
   await initWorker(workerRepository, WORKER_NAME);
-  startLoop(pool);
+  startLoop(pool, WORKER_NAME);
 }
 
 boostrap();

@@ -16,7 +16,13 @@ def count_active_workers(db: Session) -> int:
 def get_idle_worker(db: Session) -> WorkerState | None:
     return (
         db.query(WorkerState)
-        .filter(WorkerState.status == WorkerStatus.IDLE)
+        .filter(
+            (WorkerState.status == WorkerStatus.IDLE)
+            | (
+                (WorkerState.status == WorkerStatus.RUNNING)
+                & (WorkerState.current_campaign_id.is_(None))
+            )
+        )
         .order_by(WorkerState.id.asc())
         .first()
     )

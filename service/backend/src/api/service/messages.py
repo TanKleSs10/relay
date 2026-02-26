@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import re
+
 from sqlalchemy.orm import Session
+
 from src.domain import Message, MessageStatus
 
 def create_messages(
@@ -10,7 +13,7 @@ def create_messages(
     campaign_id: int
 ) -> Message:
     message = Message(
-        recipient=recipient,
+        recipient=normalize_mx_recipient(recipient),
         payload=payload,
         campaign_id=campaign_id,
         status=MessageStatus.QUEUED
@@ -77,7 +80,7 @@ def update_message_error(
 
 def update_message(db: Session, message: Message, recipient: str | None, payload: str | None) -> Message:
     if recipient is not None:
-        message.recipient = recipient
+        message.recipient = normalize_mx_recipient(recipient)
     if payload is not None:
         message.payload = payload
     return message
@@ -90,3 +93,14 @@ def delete_message(db: Session, message: Message) -> None:
 def delete_messages_by_campaign(db: Session, campaign_id: int) -> int:
     count = db.query(Message).filter(Message.campaign_id == campaign_id).delete()
     return count
+
+
+def normalize_mx_recipient(recipient: str) -> str:
+    digits = re.sub(r"\D", "", recipient)
+    if len(digits) == 10:
+        return f"521{digits}"
+    if len(digits) == 12 and digits.startswith("52") and not digits.startswith("521"):
+        return f"521{digits[2:]}"
+    if len(digits) == 13 and digits.startswith("521"):
+        return digits
+    return digits or recipient

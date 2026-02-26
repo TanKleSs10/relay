@@ -25,24 +25,12 @@ def _ensure_unique_campaign_name(db: Session, name: str) -> None:
 
 
 def _extract_message_row(row: dict[str, object]) -> tuple[str | None, str | None]:
-    recipient = (
-        row.get("phone")
-        or row.get("recipient")
-        or row.get("phone_number")
-    )
-    payload = (
-        row.get("message")
-        or row.get("payload")
-        or row.get("text")
-    )
+    recipient = row.get("phone") or row.get("recipient") or row.get("phone_number")
+    payload = row.get("message") or row.get("payload") or row.get("text")
     return recipient, payload
 
 
-def create_campaign_with_file(
-    name: str,
-    file: UploadFile | None,
-    db: Session
-):
+def create_campaign_with_file(name: str, file: UploadFile | None, db: Session):
     try:
         _ensure_unique_campaign_name(db, name)
 
@@ -70,7 +58,9 @@ def create_campaign_with_file(
                 invalid_rows.append({"row": idx, "data": row})
                 continue
 
-            create_messages(db, recipient=recipient, payload=payload, campaign_id=campaign.id)
+            create_messages(
+                db, recipient=recipient, payload=payload, campaign_id=campaign.id
+            )
             created += 1
 
         db.commit()
@@ -79,7 +69,8 @@ def create_campaign_with_file(
     except Exception as exc:
         db.rollback()
         raise exc
-    
+
+
 def create_campaigns(db: Session, payload: CampaignCreate) -> Campaign:
     try:
         _ensure_unique_campaign_name(db, payload.name)
@@ -92,14 +83,17 @@ def create_campaigns(db: Session, payload: CampaignCreate) -> Campaign:
         db.rollback()
         raise exc
 
+
 def get_campaigns(db: Session):
     return list_campaigns(db)
-    
+
+
 def get_campaign(campaign_id: int, db: Session):
     campaign = get_campaign_by_id(db, campaign_id)
     if not campaign:
         raise NotFoundError("Campaign not found")
     return campaign
+
 
 def update_campaign(campaign_id: int, payload: CampaignUpdate, db: Session):
     campaign = get_campaign_by_id(db, campaign_id)
@@ -115,17 +109,23 @@ def update_campaign(campaign_id: int, payload: CampaignUpdate, db: Session):
         db.rollback()
         raise exc
 
+
 def remove_campaign(campaign_id: int, db: Session):
     campaign = get_campaign_by_id(db, campaign_id)
     if not campaign:
         raise NotFoundError("Campaign not found")
+    if campaign.status == CampaignStatus.PROCESSING:
+        raise ConflictError("Cannot delete a campaign that is currently processing")
     try:
         delete_campaign(db, campaign)
         db.commit()
     except Exception as exc:
         db.rollback()
         raise exc
-    return {"status": "success", "message": f"Campaign with id {campaign_id} deleted successfully."}
+    return {
+        "status": "success",
+        "message": f"Campaign with id {campaign_id} deleted successfully.",
+    }
 
 
 def dispatch_campaign(campaign_id: int, db: Session) -> dict[str, int]:

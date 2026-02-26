@@ -29,46 +29,52 @@ export class CampaignDispatchService {
   }
 
   async dispatchOnce(workerName: string): Promise<void> {
-    const worker = await this.workerRepository.findByName(workerName);
-    if (!worker?.currentCampaignId) {
-      console.log(`Dispatch skip: worker ${workerName} has no campaign`);
-      return;
-    }
+    try {
+      const worker = await this.workerRepository.findByName(workerName);
+      if (!worker?.currentCampaignId) {
+        console.log(`Dispatch skip: worker ${workerName} has no campaign`);
+        return;
+      }
 
-    const senders = await this.senderRepository.listByStatus(
-      SenderAccountStatus.READY
-    );
-    if (!senders.length) {
-      console.log(
-        `Dispatch skip: no READY senders for campaign ${worker.currentCampaignId}`
+      const senders = await this.senderRepository.listByStatus(
+        SenderAccountStatus.READY
       );
-      return;
-    }
+      if (!senders.length) {
+        console.log(
+          `Dispatch skip: no READY senders for campaign ${worker.currentCampaignId}`
+        );
+        return;
+      }
 
-    const messages = await this.messageRepository.listQueuedByCampaign(
-      worker.currentCampaignId,
-      MAX_MESSAGES_PER_TICK
-    );
-    if (!messages.length) {
+      const messages = await this.messageRepository.listQueuedByCampaign(
+        worker.currentCampaignId,
+        MAX_MESSAGES_PER_TICK
+      );
+      if (!messages.length) {
+        console.log(
+          `Dispatch skip: no queued messages for campaign ${worker.currentCampaignId}`
+        );
+        await this.completeCampaign(worker.id, worker.currentCampaignId);
+        return;
+      }
+
       console.log(
-        `Dispatch skip: no queued messages for campaign ${worker.currentCampaignId}`
+        `Dispatching ${messages.length} messages for campaign ${worker.currentCampaignId}`
+      );
+      await Promise.all(
+        messages.map(async (message, index) => {
+          const sender = senders[index % senders.length];
+          console.log(
+            `Sending message ${message.id} via sender ${sender.id} to ${message.recipient}`
+          );
+          await this.sendWithSender(sender.id, message);
+        })
       );
       await this.completeCampaign(worker.id, worker.currentCampaignId);
-      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      console.error(`Dispatch failed for worker ${workerName}: ${message}`);
     }
-
-    console.log(
-      `Dispatching ${messages.length} messages for campaign ${worker.currentCampaignId}`
-    );
-    await Promise.all(
-      messages.map(async (message, index) => {
-        const sender = senders[index % senders.length];
-        console.log(
-          `Sending message ${message.id} via sender ${sender.id} to ${message.recipient}`
-        );
-        await this.sendWithSender(sender.id, message);
-      })
-    );
   }
 
   private async sendWithSender(senderId: number, message: MessageRow): Promise<void> {
@@ -77,10 +83,14 @@ export class CampaignDispatchService {
       await this.messageRepository.markSent(message.id);
       console.log(`Message ${message.id} marked SENT`);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
+      const errorMessage = error instanceof Error ? error.message : String(error);
       await this.messageRepository.markFailed(message.id, errorMessage);
       console.error(`Message ${message.id} failed: ${errorMessage}`);
+      if (!(error instanceof Error)) {
+        console.error(`Message ${message.id} error value:`, error);
+      } else if (error.stack) {
+        console.error(error.stack);
+      }
     }
   }
 
@@ -89,9 +99,13 @@ export class CampaignDispatchService {
       campaignId
     );
     if (remaining > 0) {
+      console.log(
+        `Campaign ${campaignId} still has ${remaining} queued messages`
+      );
       return;
     }
     await this.campaignRepository.markDone(campaignId);
     await this.workerRepository.clearCampaign(workerId);
+    console.log(`Campaign ${campaignId} marked DONE and worker cleared`);
   }
 }

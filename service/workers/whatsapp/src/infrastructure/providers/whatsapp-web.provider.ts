@@ -92,7 +92,11 @@ export class WhatsAppWebProvider implements MessageProvider {
     if (!entry?.client) {
       throw new Error(`Sender ${senderId} is not initialized`);
     }
-    await entry.client.sendMessage(to, message);
+    const recipient = normalizeRecipient(to);
+    if (recipient !== to) {
+      console.log(`Normalized recipient for sender ${senderId}: ${to} -> ${recipient}`);
+    }
+    await entry.client.sendMessage(recipient, message);
   }
 
   onQr(senderId: number, callback: (qr: string) => void): void {
@@ -115,4 +119,12 @@ export class WhatsAppWebProvider implements MessageProvider {
     entry.onDisconnect = callback;
     this.clients.set(senderId, entry);
   }
+}
+
+function normalizeRecipient(to: string): string {
+  if (to.includes("@c.us") || to.includes("@g.us")) {
+    return to;
+  }
+  const digits = to.replace(/[^\d]/g, "");
+  return `${digits}@c.us`;
 }

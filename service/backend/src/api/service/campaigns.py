@@ -15,11 +15,19 @@ def create_campaign(db: Session, payload: CampaignCreate) -> Campaign:
     db.add(campaign)
     return campaign
 
+
 def get_campaign_by_name(db: Session, name: str) -> Campaign | None:
     return db.query(Campaign).filter(Campaign.name == name).first()
 
+
 def get_campaign_by_id(db: Session, campaign_id: int) -> Campaign | None:
-    return db.query(Campaign).options(joinedload(Campaign.messages)).filter(Campaign.id == campaign_id).first()
+    return (
+        db.query(Campaign)
+        .options(joinedload(Campaign.messages))
+        .filter(Campaign.id == campaign_id)
+        .first()
+    )
+
 
 def list_campaigns(db: Session, skip: int = 0, limit: int = 100) -> list[Campaign]:
     return (
@@ -30,6 +38,7 @@ def list_campaigns(db: Session, skip: int = 0, limit: int = 100) -> list[Campaig
         .limit(limit)
         .all()
     )
+
 
 def update_campaign(
     db: Session, campaign: Campaign, payload: CampaignUpdate

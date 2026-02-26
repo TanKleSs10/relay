@@ -38,14 +38,14 @@ export class MessageRepository {
 
   async markSent(messageId: number): Promise<void> {
     await this.pool.query(
-      "UPDATE messages SET status = $2, sent_at = NOW(), updated_at = NOW() WHERE id = $1",
+      "UPDATE messages SET status = $2, sent_at = NOW() WHERE id = $1",
       [messageId, MessageStatus.SENT]
     );
   }
 
   async markFailed(messageId: number, error: string): Promise<void> {
     await this.pool.query(
-      "UPDATE messages SET status = $2, last_error = $3, attempts = attempts + 1, updated_at = NOW() WHERE id = $1",
+      "UPDATE messages SET status = $2, last_error = $3, attempts = attempts + 1 WHERE id = $1",
       [messageId, MessageStatus.FAILED, error]
     );
   }
