@@ -4,6 +4,8 @@ import type { SenderAccountStatus } from "./enums";
 export interface SenderAccountRepository {
   findById(senderId: number): Promise<SenderAccountEntity | null>;
   listByStatus(status: SenderAccountStatus): Promise<SenderAccountEntity[]>;
+  listQrRequiredWithoutCode(): Promise<SenderAccountEntity[]>;
+  listAll(): Promise<SenderAccountEntity[]>;
   updateQr(senderId: number, qrCode: string): Promise<SenderAccountEntity>;
   updateReady(
     senderId: number,

@@ -114,6 +114,7 @@ const notCampaignsHTML = `
 function createCampaign(campaign) {
   const statusInfo = statusTranslator[campaign.status] || { label: campaign.status, class: "" };
   const isProcessing = campaign.status === "PROCESSING";
+  const isFailed = campaign.status === "FAILED";
   const deleteDisabled = isProcessing ? "disabled" : "";
   const deleteTitle = isProcessing ? "No puedes eliminar una campaña en proceso" : "Eliminar campaña";
   const card = document.createElement("div");
@@ -134,8 +135,9 @@ function createCampaign(campaign) {
 					</div>
 				</div>
 			</div>
-				<div class="campaign-card__footer">
+			<div class="campaign-card__footer">
 				<button id="send-${campaign.id}" class="campaign-card__button btn--success" style="width:100%;margin-bottom:0.5rem;">Enviar Mensajes</button>
+        ${isFailed ? `<button id="retry-${campaign.id}" class="campaign-card__button btn--secondary" style="width:100%;margin-bottom:0.5rem;">Reintentar</button>` : ""}
 				<div style="display:flex; gap:0.5rem;">
 					<a href="/manage-campaign/${campaign.id}" class="campaign-card__button btn--primary" style="width:50%;">Gestionar</a>
 					<button id="delete-${campaign.id}" class="campaign-card__button btn--danger" style="width:50%;" ${deleteDisabled} title="${deleteTitle}">Eliminar</button>
@@ -268,11 +270,34 @@ const dispatchCampaign = async (id) => {
   try {
     const response = await fetch(`/campaigns/${id}/dispatch`, { method: "POST" });
     console.log("dispatchCampaign response", response.status);
-    if (!response.ok) throw new Error("Error al enviar campaña");
+    if (!response.ok) {
+      let errorDetail = "";
+      try {
+        const data = await response.json();
+        errorDetail = data?.detail || data?.error || "";
+      } catch (error) {
+        errorDetail = "";
+      }
+      if (response.status === 409 && /idle workers/i.test(errorDetail)) {
+        throw new Error("No hay workers disponibles para despachar la campaña.");
+      }
+      throw new Error(errorDetail || "Error al enviar campaña");
+    }
     updateCampaignsView();
   } catch (error) {
     console.error(error);
-    alert("No se pudo despachar la campaña.");
+    alert(error.message || "No se pudo despachar la campaña.");
+  }
+}
+
+const retryCampaign = async (id) => {
+  try {
+    const response = await fetch(`/campaigns/${id}/retry`, { method: "POST" });
+    if (!response.ok) throw new Error("No se pudo reintentar la campaña");
+    updateCampaignsView();
+  } catch (error) {
+    console.error(error);
+    alert(error.message || "Error al reintentar la campaña.");
   }
 }
 
@@ -286,5 +311,9 @@ campaignsGrid.addEventListener("click", (e) => {
     const campaignId = target.id.split("-")[1];
     console.log("send click", campaignId);
     dispatchCampaign(campaignId);
+  }
+  if (target.id && target.id.startsWith("retry-")) {
+    const campaignId = target.id.split("-")[1];
+    retryCampaign(campaignId);
   }
 });

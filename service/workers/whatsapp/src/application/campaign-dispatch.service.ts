@@ -5,7 +5,12 @@ import type { WorkerRepository } from "../domain/worker.repository.interface";
 import { CampaignRepository } from "../infrastructure/repositories/campaign.repository";
 import { MessageRepository, type MessageRow } from "../infrastructure/repositories/message.repository";
 
-const MAX_MESSAGES_PER_TICK = 6;
+const MAX_MESSAGES_PER_TICK = 12;
+const MAX_PER_SENDER_PER_TICK = 3;
+const LOW_QUEUE_THRESHOLD = 50;
+const FAST_DELAY_RANGE = { min: 150, max: 400 };
+const SLOW_DELAY_RANGE = { min: 400, max: 900 };
+const MAX_CONSECUTIVE_FAILURES = 3;
 
 export class CampaignDispatchService {
   private provider: MessageProvider;
@@ -13,6 +18,7 @@ export class CampaignDispatchService {
   private workerRepository: WorkerRepository;
   private campaignRepository: CampaignRepository;
   private messageRepository: MessageRepository;
+  private failureStreaks = new Map<number, number>();
 
   constructor(
     provider: MessageProvider,
@@ -58,18 +64,57 @@ export class CampaignDispatchService {
         return;
       }
 
+      const senderLimit = Math.max(1, senders.length) * MAX_PER_SENDER_PER_TICK;
+      const allowedCount = Math.min(messages.length, senderLimit);
+      const batch = messages.slice(0, allowedCount);
       console.log(
-        `Dispatching ${messages.length} messages for campaign ${worker.currentCampaignId}`
+        `Dispatching ${batch.length} messages for campaign ${worker.currentCampaignId}`
       );
-      await Promise.all(
-        messages.map(async (message, index) => {
-          const sender = senders[index % senders.length];
-          console.log(
-            `Sending message ${message.id} via sender ${sender.id} to ${message.recipient}`
-          );
-          await this.sendWithSender(sender.id, message);
-        })
+      console.log(
+        `Dispatch limits: max_per_tick=${MAX_MESSAGES_PER_TICK}, max_per_sender=${MAX_PER_SENDER_PER_TICK}, senders_ready=${senders.length}, queued=${messages.length}`
       );
+      const delayRange =
+        messages.length <= LOW_QUEUE_THRESHOLD
+          ? FAST_DELAY_RANGE
+          : SLOW_DELAY_RANGE;
+      console.log(
+        `Dispatch delay range: ${delayRange.min}-${delayRange.max}ms`
+      );
+      const perSenderCount = new Map<number, number>();
+      for (const message of batch) {
+        const sender = pickSender(senders, perSenderCount, MAX_PER_SENDER_PER_TICK);
+        if (!sender) {
+          console.warn("Dispatch stopped: no available senders for this tick");
+          break;
+        }
+        await sleep(randomInt(delayRange.min, delayRange.max));
+        console.log(
+          `Sending message ${message.id} via sender ${sender.id} to ${message.recipient}`
+        );
+        const sent = await this.sendWithSender(sender.id, message);
+        if (sent) {
+          this.failureStreaks.set(sender.id, 0);
+        } else {
+          const streak = (this.failureStreaks.get(sender.id) ?? 0) + 1;
+          this.failureStreaks.set(sender.id, streak);
+          if (streak >= MAX_CONSECUTIVE_FAILURES) {
+            console.warn(
+              `Sender ${sender.id} entered COOLDOWN after ${streak} failures`
+            );
+            try {
+              await this.senderRepository.updateStatus(
+                sender.id,
+                SenderAccountStatus.COOLDOWN
+              );
+            } catch (error) {
+              console.error(
+                `Failed to set COOLDOWN for sender ${sender.id}`,
+                error
+              );
+            }
+          }
+        }
+      }
       await this.completeCampaign(worker.id, worker.currentCampaignId);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
@@ -77,11 +122,15 @@ export class CampaignDispatchService {
     }
   }
 
-  private async sendWithSender(senderId: number, message: MessageRow): Promise<void> {
+  private async sendWithSender(
+    senderId: number,
+    message: MessageRow
+  ): Promise<boolean> {
     try {
       await this.provider.sendMessage(senderId, message.recipient, message.payload);
       await this.messageRepository.markSent(message.id);
       console.log(`Message ${message.id} marked SENT`);
+      return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       await this.messageRepository.markFailed(message.id, errorMessage);
@@ -91,6 +140,7 @@ export class CampaignDispatchService {
       } else if (error.stack) {
         console.error(error.stack);
       }
+      return false;
     }
   }
 
@@ -104,8 +154,40 @@ export class CampaignDispatchService {
       );
       return;
     }
-    await this.campaignRepository.markDone(campaignId);
+    const failed = await this.messageRepository.countFailedByCampaign(campaignId);
+    if (failed > 0) {
+      await this.campaignRepository.markFailed(campaignId);
+      console.log(
+        `Campaign ${campaignId} marked FAILED with ${failed} failed messages`
+      );
+    } else {
+      await this.campaignRepository.markDone(campaignId);
+      console.log(`Campaign ${campaignId} marked DONE`);
+    }
     await this.workerRepository.clearCampaign(workerId);
-    console.log(`Campaign ${campaignId} marked DONE and worker cleared`);
+    console.log(`Worker ${workerId} cleared for campaign ${campaignId}`);
   }
+}
+
+function pickSender(
+  senders: { id: number }[],
+  perSenderCount: Map<number, number>,
+  maxPerSender: number
+): { id: number } | null {
+  for (const sender of senders) {
+    const current = perSenderCount.get(sender.id) ?? 0;
+    if (current < maxPerSender) {
+      perSenderCount.set(sender.id, current + 1);
+      return sender;
+    }
+  }
+  return null;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function randomInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
 }

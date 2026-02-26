@@ -101,6 +101,26 @@ def delete_messages_by_campaign(db: Session, campaign_id: int) -> int:
     return count
 
 
+def reset_messages_by_campaign(db: Session, campaign_id: int) -> int:
+    count = (
+        db.query(Message)
+        .filter(
+            Message.campaign_id == campaign_id,
+            Message.status.in_([MessageStatus.FAILED, MessageStatus.RETRY]),
+        )
+        .update(
+            {
+                Message.status: MessageStatus.QUEUED,
+                Message.last_error: None,
+                Message.attempts: 0,
+                Message.sent_at: None,
+            },
+            synchronize_session=False,
+        )
+    )
+    return count
+
+
 def normalize_mx_recipient(recipient: str) -> str:
     digits = re.sub(r"\D", "", recipient)
     if len(digits) == 10:

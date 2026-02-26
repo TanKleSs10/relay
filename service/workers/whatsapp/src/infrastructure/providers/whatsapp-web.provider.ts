@@ -75,6 +75,15 @@ export class WhatsAppWebProvider implements MessageProvider {
     client.on("change_state", (state: string) => {
       console.log(`Provider state change for sender ${senderId}: ${state}`);
     });
+    client.on("message", async (message: any) => {
+      const body = String(message?.body ?? "").trim().toLowerCase();
+      if (body === "si") {
+        await client.sendMessage(
+          message.from,
+          "este es un mensaje de prueba desde relay por exitus credit, favor de ignoralo."
+        );
+      }
+    });
 
     console.log(`Initializing WhatsApp client for sender ${senderId}`);
     try {
@@ -118,6 +127,35 @@ export class WhatsAppWebProvider implements MessageProvider {
     const entry = this.clients.get(senderId) ?? {};
     entry.onDisconnect = callback;
     this.clients.set(senderId, entry);
+  }
+
+  async clear(senderId: number): Promise<void> {
+    const entry = this.clients.get(senderId);
+    if (entry?.client) {
+      try {
+        await entry.client.destroy();
+      } catch (error) {
+        console.warn(`Failed to destroy client for sender ${senderId}`, error);
+      }
+    }
+    this.clients.delete(senderId);
+  }
+
+  listSenderIds(): number[] {
+    return Array.from(this.clients.keys());
+  }
+
+  async getState(senderId: number): Promise<string | null> {
+    const entry = this.clients.get(senderId);
+    if (!entry?.client) {
+      return null;
+    }
+    try {
+      return await entry.client.getState();
+    } catch (error) {
+      console.warn(`Failed to get state for sender ${senderId}`, error);
+      return null;
+    }
   }
 }
 

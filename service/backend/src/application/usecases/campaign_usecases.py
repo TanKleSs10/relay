@@ -12,7 +12,7 @@ from src.api.service.campaigns import (
     update_campaign as update_campaign_service,
 )
 from src.api.service.workers import assign_campaign, get_idle_worker
-from src.api.service.messages import create_messages
+from src.api.service.messages import create_messages, reset_messages_by_campaign
 from src.domain.models import Campaign
 from src.domain import CampaignStatus
 from src.infrastructure.file_readers.factory import get_reader
@@ -160,6 +160,24 @@ def dispatch_campaign(campaign_id: int, db: Session) -> dict[str, int]:
         assign_campaign(db, worker, campaign_id)
         db.commit()
         return {"worker_id": worker.id}
+    except Exception as exc:
+        db.rollback()
+        raise exc
+
+
+def retry_campaign(campaign_id: int, db: Session) -> dict[str, int]:
+    campaign = get_campaign_by_id(db, campaign_id)
+    if not campaign:
+        raise NotFoundError("Campaign not found")
+    if not can_transition(campaign.status, CampaignStatus.QUEUED):
+        raise ConflictError(
+            f"Campaign cannot be retried from status {campaign.status}"
+        )
+    try:
+        reset_count = reset_messages_by_campaign(db, campaign_id)
+        campaign.status = CampaignStatus.QUEUED
+        db.commit()
+        return {"reset_messages": reset_count}
     except Exception as exc:
         db.rollback()
         raise exc

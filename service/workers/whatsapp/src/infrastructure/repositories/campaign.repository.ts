@@ -15,4 +15,11 @@ export class CampaignRepository {
       [campaignId, CampaignStatus.DONE]
     );
   }
+
+  async markFailed(campaignId: number): Promise<void> {
+    await this.pool.query(
+      "UPDATE campaigns SET status = $2 WHERE id = $1",
+      [campaignId, CampaignStatus.FAILED]
+    );
+  }
 }

@@ -28,6 +28,21 @@ export class SenderAccountRepository implements SenderAccountRepositoryPort {
     return result.rows.map((row) => SenderAccountEntity.fromRow(row));
   }
 
+  async listQrRequiredWithoutCode(): Promise<SenderAccountEntity[]> {
+    const result = await this.pool.query(
+      "SELECT id, provider, phone_number, status, qr_code, session_id, messages_sent_hour, last_used_at, last_qr_at, created_at, updated_at FROM sender_accounts WHERE status = $1 AND qr_code IS NULL ORDER BY id DESC",
+      [SenderAccountStatus.QR_REQUIRED]
+    );
+    return result.rows.map((row) => SenderAccountEntity.fromRow(row));
+  }
+
+  async listAll(): Promise<SenderAccountEntity[]> {
+    const result = await this.pool.query(
+      "SELECT id, provider, phone_number, status, qr_code, session_id, messages_sent_hour, last_used_at, last_qr_at, created_at, updated_at FROM sender_accounts ORDER BY id DESC"
+    );
+    return result.rows.map((row) => SenderAccountEntity.fromRow(row));
+  }
+
   async updateStatus(
     senderId: number,
     status: SenderAccountStatus

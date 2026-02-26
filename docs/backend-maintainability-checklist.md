@@ -16,15 +16,15 @@ Lista de mejoras para hacer el backend mas mantenible y escalable.
 
 ## Tipado y validacion
 - [x] Endurecer esquemas Pydantic (requeridos vs opcionales).
-- [ ] Documentar payloads con ejemplos claros.
+- [x] Documentar payloads con ejemplos claros.
 
 ## Configuracion
-- [ ] Unificar configuracion por ambiente (dev/stage/prod).
-- [ ] Consolidar DB_URL, logging y flags en `Settings`.
+- [x] Unificar configuracion por ambiente (dev/stage/prod).
+- [x] Consolidar DB_URL, logging y flags en `Settings`.
 
 ## Tests
-- [ ] Tests basicos de rutas criticas (sender creation, campaign upload, status transitions).
-- [ ] Tests de usecases principales.
+- [x] Tests basicos de rutas criticas (sender creation, campaign upload, status transitions).
+- [x] Tests de usecases principales.
 
 ## Errores y respuestas
 - [x] Manejo consistente de errores (HTTPException con codigos uniformes).

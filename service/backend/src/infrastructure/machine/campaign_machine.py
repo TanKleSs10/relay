@@ -9,7 +9,7 @@ _ALLOWED_TRANSITIONS: Final[dict[CampaignStatus, set[CampaignStatus]]] = {
     CampaignStatus.QUEUED: {CampaignStatus.PROCESSING, CampaignStatus.FAILED},
     CampaignStatus.PROCESSING: {CampaignStatus.DONE, CampaignStatus.FAILED},
     CampaignStatus.DONE: set(),
-    CampaignStatus.FAILED: set(),
+    CampaignStatus.FAILED: {CampaignStatus.QUEUED},
 }
 
 

@@ -36,6 +36,14 @@ export class MessageRepository {
     return Number(result.rows[0]?.count ?? 0);
   }
 
+  async countFailedByCampaign(campaignId: number): Promise<number> {
+    const result = await this.pool.query<{ count: string }>(
+      "SELECT COUNT(*) AS count FROM messages WHERE campaign_id = $1 AND status = $2",
+      [campaignId, MessageStatus.FAILED]
+    );
+    return Number(result.rows[0]?.count ?? 0);
+  }
+
   async markSent(messageId: number): Promise<void> {
     await this.pool.query(
       "UPDATE messages SET status = $2, sent_at = NOW() WHERE id = $1",

@@ -129,6 +129,13 @@ Click "Dispatch" ----->  POST /campaigns/{id}/dispatch  -> worker_states.current
    - Campaign -> `DONE`
    - Worker -> `IDLE` + `current_campaign_id NULL`
 
+## Basic anti-ban and rotation (current)
+
+- Global limit per tick: 6 messages.
+- Per-sender limit per tick: 2 messages.
+- Delay/jitter between sends: 300–800 ms.
+- Sender cooldown: after 3 consecutive failures, sender is marked `COOLDOWN`.
+
 ## Known failure points and fixes
 
 - **409 No idle workers available**

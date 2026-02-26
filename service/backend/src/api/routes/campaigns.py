@@ -5,6 +5,7 @@ from src.application.usecases.campaign_usecases import (
     get_campaign,
     get_campaigns,
     remove_campaign,
+    retry_campaign,
     update_campaign,
 )
 from fastapi import APIRouter, Depends, File, Form, UploadFile, status
@@ -73,3 +74,8 @@ def delete_item(campaign_id: int, db: Session = Depends(get_db)):
 @router.post("/{campaign_id}/dispatch", status_code=status.HTTP_202_ACCEPTED)
 def dispatch_item(campaign_id: int, db: Session = Depends(get_db)):
     return dispatch_campaign(campaign_id, db)
+
+
+@router.post("/{campaign_id}/retry", status_code=status.HTTP_202_ACCEPTED)
+def retry_item(campaign_id: int, db: Session = Depends(get_db)):
+    return retry_campaign(campaign_id, db)
