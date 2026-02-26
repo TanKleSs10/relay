@@ -14,7 +14,7 @@
 ## Features
 - [x] [HIGH] Campaign completion: mark DONE, release worker, and clear campaign assignment.
 - [ ] [MED] Worker selection strategy (round-robin or least-loaded).
-- [ ] [MED] Add API endpoint to reset worker to IDLE.
+- [x] [MED] Add API endpoint to reset worker to IDLE.
 - [ ] [LOW] Persist phone number on READY in DB and show in UI.
 
 ## Maintainability

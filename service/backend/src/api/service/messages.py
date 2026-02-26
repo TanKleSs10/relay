@@ -4,7 +4,9 @@ import re
 
 from sqlalchemy.orm import Session
 
+from src.application.errors import ConflictError
 from src.domain import Message, MessageStatus
+from src.infrastructure.machine.message_machine import can_transition
 
 def create_messages(
     db: Session,
@@ -65,6 +67,10 @@ def list_messages_by_status(
 def update_message_status(
     db: Session, message: Message, status: MessageStatus
 ) -> Message:
+    if not can_transition(message.status, status):
+        raise ConflictError(
+            f"Invalid message status transition {message.status} -> {status}"
+        )
     message.status = status
     return message
 

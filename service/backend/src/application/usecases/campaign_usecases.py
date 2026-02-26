@@ -16,6 +16,7 @@ from src.api.service.messages import create_messages
 from src.domain.models import Campaign
 from src.domain import CampaignStatus
 from src.infrastructure.file_readers.factory import get_reader
+from src.infrastructure.machine.campaign_machine import can_transition
 
 
 def _ensure_unique_campaign_name(db: Session, name: str) -> None:
@@ -75,6 +76,14 @@ def create_campaigns(db: Session, payload: CampaignCreate) -> Campaign:
     try:
         _ensure_unique_campaign_name(db, payload.name)
 
+        if payload.status and payload.status not in {
+            CampaignStatus.CREATED,
+            CampaignStatus.QUEUED,
+        }:
+            raise ConflictError(
+                "Campaign status can only start as CREATED or QUEUED"
+            )
+
         campaign = create_campaign(db, payload)
         db.commit()
         db.refresh(campaign)
@@ -99,6 +108,11 @@ def update_campaign(campaign_id: int, payload: CampaignUpdate, db: Session):
     campaign = get_campaign_by_id(db, campaign_id)
     if not campaign:
         raise NotFoundError("Campaign not found")
+
+    if payload.status and not can_transition(campaign.status, payload.status):
+        raise ConflictError(
+            f"Invalid campaign status transition {campaign.status} -> {payload.status}"
+        )
 
     try:
         campaign = update_campaign_service(db, campaign, payload)
@@ -132,8 +146,10 @@ def dispatch_campaign(campaign_id: int, db: Session) -> dict[str, int]:
     campaign = get_campaign_by_id(db, campaign_id)
     if not campaign:
         raise NotFoundError("Campaign not found")
-    if campaign.status == CampaignStatus.PROCESSING:
-        raise ConflictError("Campaign is already processing")
+    if not can_transition(campaign.status, CampaignStatus.PROCESSING):
+        raise ConflictError(
+            f"Campaign cannot be dispatched from status {campaign.status}"
+        )
 
     worker = get_idle_worker(db)
     if not worker:

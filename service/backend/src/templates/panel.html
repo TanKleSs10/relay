@@ -2,51 +2,60 @@
 <html lang="es">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Relay - Panel de Control</title>
-    <link rel="stylesheet" href="/statics/css/styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relay - Panel de Control</title>
+  <link rel="stylesheet" href="/statics/css/styles.css">
 </head>
 
 <body>
-    <!-- Header -->
-    <header class="header">
-        <div class="header__container">
-            <h1 class="header__title">⚡ Relay</h1>
-        </div>
-    </header>
+  <!-- Header -->
+  <header class="header">
+    <div class="header__container">
+      <h1 class="header__title">⚡ Relay</h1>
+    </div>
+  </header>
 
-    <!-- Contenido principal -->
-    <main class="container">
-        <!-- Sección de acciones -->
-        <section class="actions">
-            <h2 class="actions__title">Acciones</h2>
-            <div class="actions__group">
-                <a href="/manage-channels" class="btn btn--primary">
-                    ⚙️ Administrar Canales
-                </a>
-                <a href="/create-campaign">
-                    <button class="btn btn--tertiary">
-                        📧 Crear Campaña
-                    </button>
-                </a>
-            </div>
-            <div class="workers-summary" style="margin-top: 20px;">
-                <span class="workers-summary__label">Workers activos</span>
-                <span id="active-workers-count" class="workers-summary__value">0</span>
-            </div>
-        </section>
+  <!-- Contenido principal -->
+  <main class="container">
+    <!-- Sección de acciones -->
+    <section class="actions">
+      <h2 class="actions__title">Acciones</h2>
+      <div class="actions__group">
+        <a href="/manage-channels" class="btn btn--primary">
+          ⚙️ Administrar Canales
+        </a>
+        <a href="/create-campaign">
+          <button class="btn btn--tertiary">
+            📧 Crear Campaña
+          </button>
+        </a>
+        <button id="reset-worker-btn" type="button" class="btn btn--danger">Reset worker</button>
+      </div>
+      <div class="workers-summary" style="margin-top: 20px;">
+        <span class="workers-summary__label" title="Workers listos para recibir una campaña">
+          Workers disponibles
+        </span>
+        <span id="available-workers-count" class="workers-summary__value">0</span>
+      </div>
+      <div class="workers-summary" style="margin-top: 12px;">
+        <span class="workers-summary__label" title="Workers procesando campañas">
+          Workers activos
+        </span>
+        <span id="active-workers-count" class="workers-summary__value">0</span>
+      </div>
+    </section>
 
-        <!-- Sección de campañas -->
-        <section class="campaigns">
-            <h2 class="campaigns__title">Campaña Activas</h2>
+    <!-- Sección de campañas -->
+    <section class="campaigns">
+      <h2 class="campaigns__title">Campaña Activas</h2>
 
-            <!-- Grid de campañas -->
-            <div id="campaigns-container" class="campaigns__grid">
-                <!-- Las tarjetas de campaña se cargarán aquí dinámicamente -->
-            </div>
-        </section>
-    </main>
+      <!-- Grid de campañas -->
+      <div id="campaigns-container" class="campaigns__grid">
+        <!-- Las tarjetas de campaña se cargarán aquí dinámicamente -->
+      </div>
+    </section>
+  </main>
 </body>
 <script type="module" src="/statics/js/app.js"></script>
 

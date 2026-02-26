@@ -26,8 +26,11 @@ function buildCampaignStatusTranslator(enumIndex) {
 // Define constats and variables
 const btnWA = document.querySelector("#btn-wa");
 const campaignsGrid = document.querySelector("#campaigns-container");
+const availableWorkersCount = document.querySelector("#available-workers-count");
 const activeWorkersCount = document.querySelector("#active-workers-count");
+const resetWorkerBtn = document.querySelector("#reset-worker-btn");
 let campaigns = [];
+const campaignStatusById = new Map();
 
 function ensureQrModal() {
   let modal = document.getElementById("qr-modal");
@@ -110,6 +113,9 @@ const notCampaignsHTML = `
 
 function createCampaign(campaign) {
   const statusInfo = statusTranslator[campaign.status] || { label: campaign.status, class: "" };
+  const isProcessing = campaign.status === "PROCESSING";
+  const deleteDisabled = isProcessing ? "disabled" : "";
+  const deleteTitle = isProcessing ? "No puedes eliminar una campaña en proceso" : "Eliminar campaña";
   const card = document.createElement("div");
   card.className = "campaign-card";
   card.innerHTML = `
@@ -128,19 +134,21 @@ function createCampaign(campaign) {
 					</div>
 				</div>
 			</div>
-			<div class="campaign-card__footer">
+				<div class="campaign-card__footer">
 				<button id="send-${campaign.id}" class="campaign-card__button btn--success" style="width:100%;margin-bottom:0.5rem;">Enviar Mensajes</button>
 				<div style="display:flex; gap:0.5rem;">
 					<a href="/manage-campaign/${campaign.id}" class="campaign-card__button btn--primary" style="width:50%;">Gestionar</a>
-					<button id="delete-${campaign.id}" class="campaign-card__button btn--danger" style="width:50%;">Eliminar</button>
+					<button id="delete-${campaign.id}" class="campaign-card__button btn--danger" style="width:50%;" ${deleteDisabled} title="${deleteTitle}">Eliminar</button>
 				</div>
 			</div>
 		`;
   campaignsGrid.appendChild(card);
+  campaignStatusById.set(String(campaign.id), campaign.status);
 }
 
 function renderCampaigns(campaigns) {
   campaignsGrid.innerHTML = "";
+  campaignStatusById.clear();
   if (campaigns.length === 0) {
     campaignsGrid.innerHTML = notCampaignsHTML;
     return;
@@ -165,10 +173,26 @@ async function updateCampaignsView() {
   renderCampaigns(campaigns);
 }
 
+async function fetchAvailableWorkersCount() {
+  const response = await fetch("/workers/available-count");
+  if (!response.ok) throw new Error("No se pudo consultar workers disponibles");
+  return await response.json();
+}
+
 async function fetchActiveWorkersCount() {
   const response = await fetch("/workers/active-count");
   if (!response.ok) throw new Error("No se pudo consultar workers activos");
   return await response.json();
+}
+
+async function updateAvailableWorkersView() {
+  if (!availableWorkersCount) return;
+  try {
+    const data = await fetchAvailableWorkersCount();
+    availableWorkersCount.textContent = String(data.available_workers ?? 0);
+  } catch (error) {
+    availableWorkersCount.textContent = "-";
+  }
 }
 
 async function updateActiveWorkersView() {
@@ -189,11 +213,29 @@ async function initDashboard() {
     statusTranslator = buildCampaignStatusTranslator(null);
   }
   updateCampaignsView();
+  updateAvailableWorkersView();
   updateActiveWorkersView();
-  setInterval(updateActiveWorkersView, 5000);
+  setInterval(() => {
+    updateAvailableWorkersView();
+    updateActiveWorkersView();
+  }, 5000);
 }
 
 initDashboard();
+
+if (resetWorkerBtn) {
+  resetWorkerBtn.addEventListener("click", async () => {
+    try {
+      const response = await fetch("/workers/1/reset", { method: "POST" });
+      if (!response.ok) throw new Error("No se pudo resetear el worker");
+      await updateAvailableWorkersView();
+      await updateActiveWorkersView();
+      alert("Worker reseteado");
+    } catch (error) {
+      alert("Error al resetear el worker");
+    }
+  });
+}
 
 if (btnWA) {
   btnWA.addEventListener("click", async () => {
@@ -208,6 +250,11 @@ if (btnWA) {
 
 const deleteCampaign = async (id) => {
   try {
+    const status = campaignStatusById.get(String(id));
+    if (status === "PROCESSING") {
+      alert("No puedes eliminar una campaña en proceso.");
+      return;
+    }
     const response = await fetch(`/campaigns/${id}`, { method: "DELETE" });
     if (!response.ok) throw new Error("Error al eliminar campaña");
     updateCampaignsView();
