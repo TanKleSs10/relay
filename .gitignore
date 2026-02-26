@@ -26,3 +26,12 @@ htmlcov/
 
 # OS
 .DS_Store
+
+# Node.js
+node_modules/
+dist/
+build/
+
+.wwebjs_auth/*
+.wwebjs_auth/
+.wwebjs_cache/

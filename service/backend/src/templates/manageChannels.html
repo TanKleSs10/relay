@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relay - Administrar Canales</title>
+    <link rel="stylesheet" href="/statics/css/styles.css?v=20260217-1">
+</head>
+
+<body>
+    <header class="header">
+        <div class="header__container">
+            <h1 class="header__title">⚡ Relay</h1>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="actions">
+            <div class="actions__group">
+                <a href="/" class="btn btn--secondary">← Volver al Panel</a>
+                <button id="create-channel-btn" class="btn btn--primary">➕ Crear Canal</button>
+            </div>
+        </section>
+
+        <section class="campaigns">
+            <h2 class="campaigns__title">Canales</h2>
+            <div id="channels-container" class="channel-list"></div>
+        </section>
+    </main>
+
+    <div id="qr-modal" class="qr-modal">
+        <div class="qr-modal__content">
+            <h3 class="campaigns__title">QR del Canal</h3>
+            <img id="qr-image" class="qr-modal__image" alt="QR del canal">
+            <p id="qr-text" class="qr-modal__text"></p>
+            <button id="close-qr-btn" class="btn btn--secondary btn--small">Cerrar</button>
+        </div>
+    </div>
+
+    <script type="module" src="/statics/js/manageChannels.js?v=20260217-1"></script>
+</body>
+
+</html>

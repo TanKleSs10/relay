@@ -1,53 +1,65 @@
-# Relay API
+# Relay
 
-Relay es un sistema de _message dispatch_ para envíos masivos de WhatsApp con reglas anti-bloqueo y separación clara entre orquestación, ejecución y canal de envío. Este servicio corresponde al componente **API (FastAPI)** del MVP y se enfoca en la orquestación del flujo.
+Relay is a product‑first WhatsApp campaign dispatcher for teams that need to send
+high‑volume messages without losing control of deliverability. It separates
+**orchestration (API)**, **execution (worker)**, and **channel (provider)** so you
+can scale or swap providers later without rewriting business logic.
 
-## Alcance del MVP
-- Validar la arquitectura general del sistema.
-- Demostrar registro de números WhatsApp vía QR.
-- Encolar mensajes a partir de CSV.
-- Ejecutar envíos en background mediante un worker.
-- Aplicar reglas de envío y exponer estado.
+## Product goal
 
-Fuera de alcance: autenticación/roles, UI completa, uso productivo continuo, SMS/Email, API pública, multi-tenant y facturación.
+Provide a reliable workflow to:
+- register WhatsApp senders via QR,
+- upload campaigns from CSV,
+- dispatch messages safely with basic anti‑ban rules,
+- track status end‑to‑end.
 
-## Funcionalidades principales (API)
-- Configurar reglas de envío del worker.
-- Registrar números emisores y exponer QR de sesión.
-- Cargar campañas y mensajes desde CSV con validaciones.
-- Estimar capacidad y tiempos en base a reglas y disponibilidad.
-- Exponer estado de campañas y del sistema.
+## MVP scope
+- Sender onboarding via QR (WhatsApp Web).
+- Campaign creation and CSV ingestion.
+- Background dispatch with rotation and throttling.
+- Campaign status tracking and retry.
 
-## Arquitectura (resumen)
+Out of scope: authentication/roles, multi‑tenant, billing, public API, SMS/email.
+
+## User flow
+1) Create a campaign.
+2) Upload a CSV of recipients and messages.
+3) Register sender numbers (QR).
+4) Dispatch the campaign.
+5) Track status and retry failures if needed.
+
+## Architecture overview
 ```
-UI mínima / CLI
-        ↓
-      API (FastAPI)
-        ↓
-   PostgreSQL  ← contrato central
-        ↑
-     Worker (Python)
-        ↓
- WhatsApp Provider (Web-based)
+Web UI
+  ↓
+API (FastAPI)
+  ↓
+PostgreSQL (source of truth)
+  ↑
+Worker (Node/WhatsApp Web)
+  ↓
+Provider (whatsapp-web.js)
 ```
-Principios clave: la API no envía mensajes, el worker no expone endpoints, el provider no contiene lógica de negocio y la BD es el punto de coordinación.
 
-## Endpoints del MVP (resumen)
-- `/health`
-- `/senders`
-- `/senders/{id}/qr`
-- `/worker/rules`
-- `/campaigns`
-- `/campaigns/{id}/messages/upload`
-- `/campaigns/{id}/estimate`
-- `/campaigns/{id}/dispatch`
-- `/campaigns/{id}/status`
+## Screenshots (placeholders)
 
-## CSV y mensajes dinámicos
-- Columnas mínimas: `phone_number,name,b_reference,…`
-- Máximo 20 filas (demo), teléfono no vacío y variables completas.
-- Template de mensaje definido en el request (ejemplo):
-  `Hola {{name}}, tu saldo es {{balance}}.`
+Add your images here:
 
-## Estado actual
-Este MVP valida flujo operativo y viabilidad técnica. Cualquier escalamiento o extensión requiere una nueva fase formal.
+- Dashboard image:
+  `docs/images/dashboard.png`
+- Campaign list image:
+  `docs/images/campaigns.png`
+- Channel/QR image:
+  `docs/images/channels.png`
+- Campaign detail image:
+  `docs/images/campaign-detail.png`
+
+Example usage:
+```
+![Dashboard](docs/images/dashboard.png)
+```
+
+## Status
+
+The MVP is functional and ready for controlled testing. The next phase is
+hardening (observability, retries, compliance) and scaling throughput.
