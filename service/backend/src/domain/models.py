@@ -140,7 +140,7 @@ class SenderAccount(Base):
     )
 
     send_logs: Mapped[list[SendLog]] = relationship(
-        "SendLog", back_populates="sender_account", cascade="all, delete-orphan"
+        "SendLog", back_populates="sender", cascade="all, delete-orphan"
     )
 
 
@@ -174,6 +174,10 @@ class Worker(Base):
     last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    send_logs: Mapped[list["SendLog"]] = relationship(
+        "SendLog", back_populates="worker", cascade="all, delete-orphan"
+    )
+
 
 class SendLog(Base):
     __tablename__ = "send_logs"
@@ -182,8 +186,11 @@ class SendLog(Base):
     message_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("messages.id"), nullable=False
     )
-    sender_account_id: Mapped[int] = mapped_column(
+    sender_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("sender_accounts.id"), nullable=False
+    )
+    worker_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("workers.id"), nullable=False
     )
     status: Mapped[str] = mapped_column(String(50), nullable=False)
     error_message: Mapped[str | None] = mapped_column(Text)
@@ -193,7 +200,7 @@ class SendLog(Base):
     )
 
     message: Mapped[Message] = relationship("Message", back_populates="send_logs")
-    sender_account: Mapped[SenderAccount] = relationship(
+    sender: Mapped[SenderAccount] = relationship(
         "SenderAccount", back_populates="send_logs"
     )
-
+    worker: Mapped[Worker] = relationship("Worker", back_populates="send_logs")

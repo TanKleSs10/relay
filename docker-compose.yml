@@ -3,8 +3,6 @@ services:
     build:
       context: ./service/backend
       dockerfile: Dockerfile.api
-    ports:
-      - "8000:8000"
     env_file:
       - .env
     volumes:
@@ -22,8 +20,6 @@ services:
       POSTGRES_DB: ${DB_NAME}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     networks:
       - relay-network
 
@@ -39,6 +35,21 @@ services:
       - whatsapp_auth:/app/.wwebjs_auth
     depends_on:
       - db
+    networks:
+      - relay-network
+
+  frontend:
+    build:
+      context: ./service/frontend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      - VITE_API_PROXY_TARGET=http://api:8000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
     networks:
       - relay-network
 
