@@ -5,11 +5,10 @@ from typing import Final
 from src.domain import CampaignStatus
 
 _ALLOWED_TRANSITIONS: Final[dict[CampaignStatus, set[CampaignStatus]]] = {
-    CampaignStatus.CREATED: {CampaignStatus.QUEUED, CampaignStatus.PROCESSING},
-    CampaignStatus.QUEUED: {CampaignStatus.PROCESSING, CampaignStatus.FAILED},
-    CampaignStatus.PROCESSING: {CampaignStatus.DONE, CampaignStatus.FAILED},
-    CampaignStatus.DONE: set(),
-    CampaignStatus.FAILED: {CampaignStatus.QUEUED},
+    CampaignStatus.CREATED: {CampaignStatus.ACTIVE, CampaignStatus.PAUSED},
+    CampaignStatus.ACTIVE: {CampaignStatus.PAUSED, CampaignStatus.FINISHED},
+    CampaignStatus.PAUSED: {CampaignStatus.ACTIVE, CampaignStatus.FINISHED},
+    CampaignStatus.FINISHED: set(),
 }
 
 

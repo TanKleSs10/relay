@@ -5,9 +5,8 @@ from typing import Final
 from src.domain import WorkerStatus
 
 _ALLOWED_TRANSITIONS: Final[dict[WorkerStatus, set[WorkerStatus]]] = {
-    WorkerStatus.IDLE: {WorkerStatus.RUNNING, WorkerStatus.ERROR},
-    WorkerStatus.RUNNING: {WorkerStatus.IDLE, WorkerStatus.ERROR},
-    WorkerStatus.ERROR: {WorkerStatus.IDLE},
+    WorkerStatus.ONLINE: {WorkerStatus.OFFLINE},
+    WorkerStatus.OFFLINE: {WorkerStatus.ONLINE},
 }
 
 

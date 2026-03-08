@@ -13,7 +13,7 @@ export class SenderAccountRepository implements SenderAccountRepositoryPort {
 
   async findById(senderId: number): Promise<SenderAccountEntity | null> {
     const result = await this.pool.query(
-      "SELECT id, provider, phone_number, status, qr_code, session_id, messages_sent_hour, last_used_at, last_qr_at, created_at, updated_at FROM sender_accounts WHERE id = $1 LIMIT 1",
+      "SELECT id, phone_number, status, qr_code, qr_generated_at, session_path, cooldown_until, last_sent_at, created_at, updated_at FROM sender_accounts WHERE id = $1 LIMIT 1",
       [senderId]
     );
     const row = result.rows[0];
@@ -22,7 +22,7 @@ export class SenderAccountRepository implements SenderAccountRepositoryPort {
 
   async listByStatus(status: SenderAccountStatus): Promise<SenderAccountEntity[]> {
     const result = await this.pool.query(
-      "SELECT id, provider, phone_number, status, qr_code, session_id, messages_sent_hour, last_used_at, last_qr_at, created_at, updated_at FROM sender_accounts WHERE status = $1 ORDER BY id DESC",
+      "SELECT id, phone_number, status, qr_code, qr_generated_at, session_path, cooldown_until, last_sent_at, created_at, updated_at FROM sender_accounts WHERE status = $1 ORDER BY id DESC",
       [status]
     );
     return result.rows.map((row) => SenderAccountEntity.fromRow(row));
@@ -30,15 +30,19 @@ export class SenderAccountRepository implements SenderAccountRepositoryPort {
 
   async listQrRequiredWithoutCode(): Promise<SenderAccountEntity[]> {
     const result = await this.pool.query(
-      "SELECT id, provider, phone_number, status, qr_code, session_id, messages_sent_hour, last_used_at, last_qr_at, created_at, updated_at FROM sender_accounts WHERE status = $1 AND qr_code IS NULL ORDER BY id DESC",
-      [SenderAccountStatus.QR_REQUIRED]
+      "SELECT id, phone_number, status, qr_code, qr_generated_at, session_path, cooldown_until, last_sent_at, created_at, updated_at FROM sender_accounts WHERE status = ANY($1) AND qr_code IS NULL ORDER BY id DESC",
+      [[
+        SenderAccountStatus.CREATED,
+        SenderAccountStatus.INITIALIZING,
+        SenderAccountStatus.WAITING_QR,
+      ]]
     );
     return result.rows.map((row) => SenderAccountEntity.fromRow(row));
   }
 
   async listAll(): Promise<SenderAccountEntity[]> {
     const result = await this.pool.query(
-      "SELECT id, provider, phone_number, status, qr_code, session_id, messages_sent_hour, last_used_at, last_qr_at, created_at, updated_at FROM sender_accounts ORDER BY id DESC"
+      "SELECT id, phone_number, status, qr_code, qr_generated_at, session_path, cooldown_until, last_sent_at, created_at, updated_at FROM sender_accounts ORDER BY id DESC"
     );
     return result.rows.map((row) => SenderAccountEntity.fromRow(row));
   }
@@ -47,8 +51,9 @@ export class SenderAccountRepository implements SenderAccountRepositoryPort {
     senderId: number,
     status: SenderAccountStatus
   ): Promise<SenderAccountEntity> {
+    console.log(`Sender ${senderId} -> status ${status}`);
     const result = await this.pool.query(
-      "UPDATE sender_accounts SET status = $2, updated_at = NOW() WHERE id = $1 RETURNING id, provider, phone_number, status, qr_code, session_id, messages_sent_hour, last_used_at, last_qr_at, created_at, updated_at",
+      "UPDATE sender_accounts SET status = $2, updated_at = NOW() WHERE id = $1 RETURNING id, phone_number, status, qr_code, qr_generated_at, session_path, cooldown_until, last_sent_at, created_at, updated_at",
       [senderId, status]
     );
     const row = result.rows[0];
@@ -59,9 +64,10 @@ export class SenderAccountRepository implements SenderAccountRepositoryPort {
   }
 
   async updateQr(senderId: number, qrCode: string): Promise<SenderAccountEntity> {
+    console.log(`Sender ${senderId} -> status ${SenderAccountStatus.WAITING_QR}`);
     const result = await this.pool.query(
-      "UPDATE sender_accounts SET status = $2, qr_code = $3, last_qr_at = NOW(), updated_at = NOW() WHERE id = $1 RETURNING id, provider, phone_number, status, qr_code, session_id, messages_sent_hour, last_used_at, last_qr_at, created_at, updated_at",
-      [senderId, SenderAccountStatus.QR_REQUIRED, qrCode]
+      "UPDATE sender_accounts SET status = $2, qr_code = $3, qr_generated_at = NOW(), updated_at = NOW() WHERE id = $1 RETURNING id, phone_number, status, qr_code, qr_generated_at, session_path, cooldown_until, last_sent_at, created_at, updated_at",
+      [senderId, SenderAccountStatus.WAITING_QR, qrCode]
     );
     const row = result.rows[0];
     if (!row) {
@@ -74,15 +80,16 @@ export class SenderAccountRepository implements SenderAccountRepositoryPort {
     senderId: number,
     phoneNumber: string | null
   ): Promise<SenderAccountEntity> {
+    console.log(`Sender ${senderId} -> status ${SenderAccountStatus.CONNECTED}`);
     const result = await this.pool.query(
-      "UPDATE sender_accounts SET status = $2, phone_number = $3, qr_code = NULL, updated_at = NOW() WHERE id = $1 RETURNING id, provider, phone_number, status, qr_code, session_id, messages_sent_hour, last_used_at, last_qr_at, created_at, updated_at",
-      [senderId, SenderAccountStatus.READY, phoneNumber]
+      "UPDATE sender_accounts SET status = $2, phone_number = $3, qr_code = NULL, updated_at = NOW() WHERE id = $1 RETURNING id, phone_number, status, qr_code, qr_generated_at, session_path, cooldown_until, last_sent_at, created_at, updated_at",
+      [senderId, SenderAccountStatus.CONNECTED, phoneNumber]
     );
     const row = result.rows[0];
     if (!row) {
-      throw new Error(`Sender account ${senderId} not found for READY update`);
+      throw new Error(`Sender account ${senderId} not found for CONNECTED update`);
     }
-    console.log(`Sender account ${senderId} marked READY with phone number: ${phoneNumber}`);
+    console.log(`Sender account ${senderId} marked CONNECTED with phone number: ${phoneNumber}`);
     return SenderAccountEntity.fromRow(row);
   }
 }

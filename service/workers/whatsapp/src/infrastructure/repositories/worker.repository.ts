@@ -1,7 +1,7 @@
 import type { Pool } from "pg";
 
 import { WorkerEntity } from "../../domain/worker.entity";
-import type { WorkerStatus } from "../../domain/enums";
+import type { WorkerStatus, WorkerType } from "../../domain/enums";
 import type { WorkerRepository as WorkerRepositoryPort } from "../../domain/worker.repository.interface";
 
 export class WorkerRepository implements WorkerRepositoryPort {
@@ -13,7 +13,7 @@ export class WorkerRepository implements WorkerRepositoryPort {
 
   async findByName(workerName: string): Promise<WorkerEntity | null> {
     const result = await this.pool.query(
-      "SELECT id, worker_name, status, current_campaign_id, last_heartbeat, updated_at FROM worker_states WHERE worker_name = $1 LIMIT 1",
+      "SELECT id, worker_name, worker_type, status, last_seen, started_at FROM workers WHERE worker_name = $1 LIMIT 1",
       [workerName]
     );
     const row = result.rows[0];
@@ -22,28 +22,19 @@ export class WorkerRepository implements WorkerRepositoryPort {
 
   async createWorker(
     workerName: string,
-    status: WorkerStatus,
-    currentCampaignId: number | null = null
+    status: WorkerStatus
   ): Promise<WorkerEntity> {
     const result = await this.pool.query(
-      "INSERT INTO worker_states (worker_name, status, current_campaign_id, last_heartbeat, updated_at) VALUES ($1, $2, $3, NOW(), NOW()) RETURNING id, worker_name, status, current_campaign_id, last_heartbeat, updated_at",
-      [workerName, status, currentCampaignId]
+      "INSERT INTO workers (worker_name, worker_type, status, last_seen, started_at) VALUES ($1, $2, $3, NOW(), NOW()) RETURNING id, worker_name, worker_type, status, last_seen, started_at",
+      [workerName, WorkerType.SESSION, status]
     );
     return WorkerEntity.fromRow(result.rows[0]);
   }
 
   async updateStatus(workerId: number, status: WorkerStatus): Promise<WorkerEntity> {
     const result = await this.pool.query(
-      "UPDATE worker_states SET status = $2, updated_at = NOW() WHERE id = $1 RETURNING id, worker_name, status, current_campaign_id, last_heartbeat, updated_at",
+      "UPDATE workers SET status = $2, last_seen = NOW() WHERE id = $1 RETURNING id, worker_name, worker_type, status, last_seen, started_at",
       [workerId, status]
-    );
-    return WorkerEntity.fromRow(result.rows[0]);
-  }
-
-  async clearCampaign(workerId: number): Promise<WorkerEntity> {
-    const result = await this.pool.query(
-      "UPDATE worker_states SET status = $2, current_campaign_id = NULL, updated_at = NOW() WHERE id = $1 RETURNING id, worker_name, status, current_campaign_id, last_heartbeat, updated_at",
-      [workerId, "IDLE"]
     );
     return WorkerEntity.fromRow(result.rows[0]);
   }

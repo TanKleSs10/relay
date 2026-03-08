@@ -11,7 +11,6 @@ import { CampaignRepository } from "../infrastructure/repositories/campaign.repo
 import { MessageRepository } from "../infrastructure/repositories/message.repository";
 import { SenderAccountRepository } from "../infrastructure/repositories/sender-account.repository";
 import type { SenderAccountEntity } from "../domain/sender-account.entity";
-import { WorkerRepository } from "../infrastructure/repositories/worker.repository";
 
 const LOOP_INTERVAL_MS = 2000;
 const AUTH_DATA_PATH = "/tmp/whatsapp";
@@ -19,29 +18,23 @@ const AUTH_DATA_PATH = "/tmp/whatsapp";
 export function startLoop(pool: Pool, workerName: string): void {
   const provider = createMessageProvider();
   const senderRepository = new SenderAccountRepository(pool);
-  const workerRepository = new WorkerRepository(pool);
   const messageRepository = new MessageRepository(pool);
   const campaignRepository = new CampaignRepository(pool);
   const dispatchService = new CampaignDispatchService(
     provider,
     senderRepository,
-    workerRepository,
     messageRepository,
     campaignRepository
   );
+  let tickCount = 0;
+  const bootstrappedAt = new Map<number, number>();
 
   // The tick function checks for senders that require QR code initialization and sets up the necessary event handlers.
   const tick = async () => {
     try {
-      const sendersInDb = await senderRepository.listAll();
-      await syncSenderSessions(provider, senderRepository, sendersInDb);
-
-      const senders = sendersInDb.filter(
-        (sender) =>
-          sender.status === SenderAccountStatus.QR_REQUIRED &&
-          sender.qrCode === null
-      );
-      if (senders.length) {
+      tickCount += 1;
+      const senders = await senderRepository.listQrRequiredWithoutCode();
+      if (senders.length > 0) {
         console.log(
           `Found ${senders.length} senders requiring QR code initialization.`
         );
@@ -66,10 +59,10 @@ export function startLoop(pool: Pool, workerName: string): void {
               );
               try {
                 await senderRepository.updateReady(sender.id, phoneNumber ?? null);
-                console.log(`Sender ${sender.id} marked READY`);
+                console.log(`Sender ${sender.id} marked CONNECTED`);
               } catch (error) {
                 console.error(
-                  `Failed to mark READY for sender ${sender.id}`,
+                  `Failed to mark CONNECTED for sender ${sender.id}`,
                   error
                 );
                 if (String(error).includes("not found")) {
@@ -81,7 +74,17 @@ export function startLoop(pool: Pool, workerName: string): void {
           })
         );
       }
-      await dispatchService.dispatchOnce(workerName);
+      if (tickCount % 5 === 0) {
+        const sendersInDb = await senderRepository.listAll();
+        await syncSenderSessions(
+          provider,
+          senderRepository,
+          sendersInDb,
+          bootstrappedAt,
+          tickCount
+        );
+      }
+      await dispatchService.dispatchOnce();
     } catch (error) {
       console.error("Sender loop failed:", error);
     }
@@ -96,7 +99,9 @@ export function startLoop(pool: Pool, workerName: string): void {
 async function syncSenderSessions(
   provider: ReturnType<typeof createMessageProvider>,
   senderRepository: SenderAccountRepository,
-  sendersInDb: SenderAccountEntity[]
+  sendersInDb: SenderAccountEntity[],
+  bootstrappedAt: Map<number, number>,
+  tickCount: number
 ): Promise<void> {
   const providerIds = new Set(provider.listSenderIds?.() ?? []);
   const dbIds = new Set(sendersInDb.map((sender) => sender.id));
@@ -110,24 +115,30 @@ async function syncSenderSessions(
   }
 
   for (const sender of sendersInDb) {
-    if (sender.status === SenderAccountStatus.READY) {
+    if (sender.status === SenderAccountStatus.CONNECTED) {
       if (!providerIds.has(sender.id)) {
-        console.log(`Bootstrapping READY sender ${sender.id}`);
+        console.log(`Bootstrapping CONNECTED sender ${sender.id}`);
         await provider.initialize(sender.id);
+        bootstrappedAt.set(sender.id, tickCount);
       }
       if (provider.getState) {
+        const bootTick = bootstrappedAt.get(sender.id);
+        if (bootTick !== undefined && tickCount - bootTick < 3) {
+          continue;
+        }
         const state = await provider.getState(sender.id);
+        console.log(`Sender ${sender.id} current state: ${state ?? "unknown"}`);
         if (state && state !== "CONNECTED") {
           const nextStatus =
             state.startsWith("UNPAIRED") || state === "CONFLICT"
-              ? SenderAccountStatus.QR_REQUIRED
-              : SenderAccountStatus.COOLDOWN;
+              ? SenderAccountStatus.WAITING_QR
+              : SenderAccountStatus.DISCONNECTED;
           console.warn(
             `Sender ${sender.id} in state ${state}. Marking ${nextStatus}.`
           );
           try {
             await senderRepository.updateStatus(sender.id, nextStatus);
-            if (nextStatus === SenderAccountStatus.QR_REQUIRED) {
+            if (nextStatus === SenderAccountStatus.WAITING_QR) {
               await provider.clear?.(sender.id);
               await cleanupAuthState(sender.id);
             }

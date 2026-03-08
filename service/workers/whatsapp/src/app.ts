@@ -1,7 +1,9 @@
 import { initWorker } from "./application/worker.service";
 import { connectDB } from "./infrastructure/db/connection";
 import { WorkerRepository } from "./infrastructure/repositories/worker.repository";
-import { startLoop } from "./scheduler/loop";
+import { initQrManager } from "./scheduler/qrManager";
+import { initSessionManager } from "./scheduler/sessionManager";
+import { delay } from "./utils/delay";
 
 const WORKER_NAME = "worker_whatsapp_1";
 
@@ -11,7 +13,6 @@ async function boostrap() {
   const pool = await connectDB();
   const workerRepository = new WorkerRepository(pool);
   await initWorker(workerRepository, WORKER_NAME);
-  startLoop(pool, WORKER_NAME);
 }
 
 boostrap();

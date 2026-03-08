@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from src.api.schemas.sender_accounts import SenderAccountCreate, SenderAccountUpdate
-from src.domain import Provider, SenderAccount, SenderAccountStatus
+from src.domain import SenderAccount, SenderAccountStatus
 
 
 def get_sender_accounts_by_status(
@@ -23,15 +23,11 @@ def list_sender_accounts(db: Session) -> list[SenderAccount]:
 def create_sender_account(
     db: Session, payload: SenderAccountCreate | None = None
 ) -> SenderAccount:
-    provider = Provider.WHATSAPP_WEB
-    if payload and payload.provider:
-        provider = payload.provider
     sender = SenderAccount(
-        provider=provider,
-        status=SenderAccountStatus.QR_REQUIRED,
+        status=SenderAccountStatus.CREATED,
         phone_number=None,
         qr_code=None,
-        session_id=None,
+        session_path=None,
     )
     db.add(sender)
     return sender

@@ -11,14 +11,14 @@ from src.infrastructure.machine.message_machine import can_transition
 def create_messages(
     db: Session,
     recipient: str,
-    payload: str,
+    content: str,
     campaign_id: int
 ) -> Message:
     message = Message(
         recipient=normalize_mx_recipient(recipient),
-        payload=payload,
+        content=content,
         campaign_id=campaign_id,
-        status=MessageStatus.QUEUED
+        status=MessageStatus.PENDING
     )
     db.add(message)
     return message
@@ -78,9 +78,8 @@ def update_message_status(
 def update_message_error(
     db: Session, message: Message, error: str, increment_attempts: bool = True
 ) -> Message:
-    message.last_error = error
     if increment_attempts:
-        message.attempts += 1
+        message.retry_count += 1
     return message
 
 
@@ -88,7 +87,7 @@ def update_message(db: Session, message: Message, recipient: str | None, payload
     if recipient is not None:
         message.recipient = normalize_mx_recipient(recipient)
     if payload is not None:
-        message.payload = payload
+        message.content = payload
     return message
 
 
@@ -106,13 +105,12 @@ def reset_messages_by_campaign(db: Session, campaign_id: int) -> int:
         db.query(Message)
         .filter(
             Message.campaign_id == campaign_id,
-            Message.status.in_([MessageStatus.FAILED, MessageStatus.RETRY]),
+            Message.status == MessageStatus.FAILED,
         )
         .update(
             {
-                Message.status: MessageStatus.QUEUED,
-                Message.last_error: None,
-                Message.attempts: 0,
+                Message.status: MessageStatus.PENDING,
+                Message.retry_count: 0,
                 Message.sent_at: None,
             },
             synchronize_session=False,

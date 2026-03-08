@@ -2,27 +2,21 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from src.domain import SendRule, Provider
+from src.domain import SendRule
 
 
 def create_send_rule(
     db: Session,
-    provider: Provider,
-    min_delay_seconds: int,
-    max_delay_seconds: int,
-    max_messages_per_hour: int,
-    max_messages_per_day: int,
-    cooldown_minutes: int,
-    active: bool = True,
+    messages_per_minute: int,
+    delay_between_messages: int,
+    active_senders: int,
+    queue_size: int,
 ) -> SendRule:
     send_rule = SendRule(
-        provider=provider,
-        min_delay_seconds=min_delay_seconds,
-        max_delay_seconds=max_delay_seconds,
-        max_messages_per_hour=max_messages_per_hour,
-        max_messages_per_day=max_messages_per_day,
-        cooldown_minutes=cooldown_minutes,
-        active=active,
+        messages_per_minute=messages_per_minute,
+        delay_between_messages=delay_between_messages,
+        active_senders=active_senders,
+        queue_size=queue_size,
     )
     db.add(send_rule)
     db.commit()
@@ -34,13 +28,8 @@ def get_send_rule_by_id(db: Session, send_rule_id: int) -> SendRule | None:
     return db.query(SendRule).filter(SendRule.id == send_rule_id).first()
 
 
-def get_active_send_rule(db: Session, provider: Provider) -> SendRule | None:
-    return (
-        db.query(SendRule)
-        .filter(SendRule.provider == provider, SendRule.active == True)
-        .order_by(SendRule.id)
-        .first()
-    )
+def get_latest_send_rule(db: Session) -> SendRule | None:
+    return db.query(SendRule).order_by(SendRule.id.desc()).first()
 
 
 def list_send_rules(db: Session, skip: int = 0, limit: int = 100) -> list[SendRule]:
@@ -54,11 +43,10 @@ def list_send_rules(db: Session, skip: int = 0, limit: int = 100) -> list[SendRu
 
 
 def list_send_rules_by_provider(
-    db: Session, provider: Provider, skip: int = 0, limit: int = 100
+    db: Session, skip: int = 0, limit: int = 100
 ) -> list[SendRule]:
     return (
         db.query(SendRule)
-        .filter(SendRule.provider == provider)
         .order_by(SendRule.id.desc())
         .offset(skip)
         .limit(limit)

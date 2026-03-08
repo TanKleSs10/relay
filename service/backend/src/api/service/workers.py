@@ -2,66 +2,48 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
+from datetime import datetime, timezone
+
 from src.application.errors import ConflictError
-from src.domain import WorkerState, WorkerStatus
+from src.domain import Worker, WorkerStatus
 from src.infrastructure.machine.worker_machine import can_transition
 
 
 def count_active_workers(db: Session) -> int:
     return (
-        db.query(WorkerState)
-        .filter(
-            (WorkerState.status == WorkerStatus.RUNNING)
-            & (WorkerState.current_campaign_id.is_not(None))
-        )
+        db.query(Worker)
+        .filter(Worker.status == WorkerStatus.ONLINE)
         .count()
     )
 
 
 def count_available_workers(db: Session) -> int:
     return (
-        db.query(WorkerState)
-        .filter(
-            (WorkerState.status == WorkerStatus.IDLE)
-            | (
-                (WorkerState.status == WorkerStatus.RUNNING)
-                & (WorkerState.current_campaign_id.is_(None))
-            )
-        )
+        db.query(Worker)
+        .filter(Worker.status == WorkerStatus.ONLINE)
         .count()
     )
 
 
-def get_idle_worker(db: Session) -> WorkerState | None:
-    return (
-        db.query(WorkerState)
-        .filter(
-            (WorkerState.status == WorkerStatus.IDLE)
-            | (
-                (WorkerState.status == WorkerStatus.RUNNING)
-                & (WorkerState.current_campaign_id.is_(None))
-            )
-        )
-        .order_by(WorkerState.id.asc())
-        .first()
-    )
+def get_idle_worker(db: Session) -> Worker | None:
+    return db.query(Worker).filter(Worker.status == WorkerStatus.ONLINE).first()
 
 
-def assign_campaign(db: Session, worker: WorkerState, campaign_id: int) -> WorkerState:
-    if not can_transition(worker.status, WorkerStatus.RUNNING):
+def assign_campaign(db: Session, worker: Worker, campaign_id: int) -> Worker:
+    if not can_transition(worker.status, WorkerStatus.ONLINE):
         raise ConflictError(
-            f"Worker {worker.id} cannot transition from {worker.status} to RUNNING"
+            f"Worker {worker.id} cannot transition from {worker.status} to ONLINE"
         )
-    worker.status = WorkerStatus.RUNNING
-    worker.current_campaign_id = campaign_id
+    worker.status = WorkerStatus.ONLINE
+    worker.last_seen = datetime.now(timezone.utc)
     return worker
 
 
-def reset_worker(db: Session, worker: WorkerState) -> WorkerState:
-    if not can_transition(worker.status, WorkerStatus.IDLE):
+def reset_worker(db: Session, worker: Worker) -> Worker:
+    if not can_transition(worker.status, WorkerStatus.ONLINE):
         raise ConflictError(
-            f"Worker {worker.id} cannot transition from {worker.status} to IDLE"
+            f"Worker {worker.id} cannot transition from {worker.status} to ONLINE"
         )
-    worker.status = WorkerStatus.IDLE
-    worker.current_campaign_id = None
+    worker.status = WorkerStatus.ONLINE
+    worker.last_seen = datetime.now(timezone.utc)
     return worker

@@ -1,10 +1,9 @@
 // Traductor de estados y clases
 const campaignStatusMeta = {
   CREATED: { label: "Creada", class: "campaign-card__status--created" },
-  QUEUED: { label: "En cola", class: "campaign-card__status--queued" },
-  PROCESSING: { label: "Procesando", class: "campaign-card__status--processing" },
-  DONE: { label: "Finalizada", class: "campaign-card__status--done" },
-  FAILED: { label: "Fallida", class: "campaign-card__status--failed" }
+  ACTIVE: { label: "Activa", class: "campaign-card__status--processing" },
+  PAUSED: { label: "Pausada", class: "campaign-card__status--queued" },
+  FINISHED: { label: "Finalizada", class: "campaign-card__status--done" }
 };
 let statusTranslator = {};
 
@@ -81,11 +80,11 @@ async function pollQr(senderId) {
   const interval = setInterval(async () => {
     try {
       const sender = await fetchSenderAccount(senderId);
-      if (sender.status === "QR_REQUIRED" && sender.qr_code) {
+      if (sender.status === "WAITING_QR" && sender.qr_code) {
         qrImage.src = sender.qr_code;
         qrStatus.textContent = "Escanea el QR con WhatsApp.";
       }
-      if (sender.status === "READY") {
+      if (sender.status === "CONNECTED") {
         qrStatus.textContent = `Canal listo: ${sender.phone_number || ""}`;
         setTimeout(() => {
           modal.style.display = "none";
@@ -113,8 +112,8 @@ const notCampaignsHTML = `
 
 function createCampaign(campaign) {
   const statusInfo = statusTranslator[campaign.status] || { label: campaign.status, class: "" };
-  const isProcessing = campaign.status === "PROCESSING";
-  const isFailed = campaign.status === "FAILED";
+  const isProcessing = campaign.status === "ACTIVE";
+  const isPaused = campaign.status === "PAUSED";
   const deleteDisabled = isProcessing ? "disabled" : "";
   const deleteTitle = isProcessing ? "No puedes eliminar una campaña en proceso" : "Eliminar campaña";
   const card = document.createElement("div");
@@ -137,7 +136,7 @@ function createCampaign(campaign) {
 			</div>
 			<div class="campaign-card__footer">
 				<button id="send-${campaign.id}" class="campaign-card__button btn--success" style="width:100%;margin-bottom:0.5rem;">Enviar Mensajes</button>
-        ${isFailed ? `<button id="retry-${campaign.id}" class="campaign-card__button btn--secondary" style="width:100%;margin-bottom:0.5rem;">Reintentar</button>` : ""}
+        ${isPaused ? `<button id="retry-${campaign.id}" class="campaign-card__button btn--secondary" style="width:100%;margin-bottom:0.5rem;">Reanudar</button>` : ""}
 				<div style="display:flex; gap:0.5rem;">
 					<a href="/manage-campaign/${campaign.id}" class="campaign-card__button btn--primary" style="width:50%;">Gestionar</a>
 					<button id="delete-${campaign.id}" class="campaign-card__button btn--danger" style="width:50%;" ${deleteDisabled} title="${deleteTitle}">Eliminar</button>
@@ -253,8 +252,8 @@ if (btnWA) {
 const deleteCampaign = async (id) => {
   try {
     const status = campaignStatusById.get(String(id));
-    if (status === "PROCESSING") {
-      alert("No puedes eliminar una campaña en proceso.");
+    if (status === "ACTIVE") {
+      alert("No puedes eliminar una campaña activa.");
       return;
     }
     const response = await fetch(`/campaigns/${id}`, { method: "DELETE" });

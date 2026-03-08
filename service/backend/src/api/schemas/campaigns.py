@@ -28,6 +28,8 @@ class CampaignRead(CampaignBase):
     id: PositiveInt
     status: CampaignStatus
     created_at: datetime
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
     messages: list[MessageRead] = Field(default_factory=list)
 
     model_config = ConfigDict(

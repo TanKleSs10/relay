@@ -6,10 +6,15 @@ const qrText = document.getElementById("qr-text");
 const closeQrBtn = document.getElementById("close-qr-btn");
 
 const senderStatusLabels = {
-  QR_REQUIRED: "Esperando QR",
-  READY: "Listo",
+  CREATED: "Creado",
+  INITIALIZING: "Inicializando",
+  WAITING_QR: "Esperando QR",
+  CONNECTED: "Conectado",
+  SENDING: "Enviando",
   COOLDOWN: "En enfriamiento",
-  BLOCKED: "Bloqueado"
+  DISCONNECTED: "Desconectado",
+  BLOCKED: "Bloqueado",
+  ERROR: "Error"
 };
 
 let senderStatusTranslator = {};

@@ -50,7 +50,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 <tr>
                     <td style='padding:8px;border-bottom:1px solid #222;'>${msg.id}</td>
                     <td style='padding:8px;border-bottom:1px solid #222;'>${msg.recipient}</td>
-                    <td style='padding:8px;border-bottom:1px solid #222;'>${msg.payload}</td>
+                    <td style='padding:8px;border-bottom:1px solid #222;'>${msg.content}</td>
                     <td style='padding:8px;border-bottom:1px solid #222;'>${msg.status}</td>
                     <td style='padding:8px;border-bottom:1px solid #222;'>
                         <a class='btn btn--primary btn--small' href='/message-form?campaign=${campaignId}&message=${msg.id}'>Editar</a>

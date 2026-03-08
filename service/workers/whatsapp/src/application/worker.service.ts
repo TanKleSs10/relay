@@ -8,12 +8,14 @@ export async function initWorker(
   console.log("Worker initialized");
   const workerExist = await repository.findByName(workerName);
   if (workerExist) {
-    console.log(`Worker with name ${workerName} already exists. Updating status to 'active'.`);
-    await repository.updateStatus(workerExist.id, WorkerStatus.IDLE);
+    console.log(
+      `Worker with name ${workerName} already exists. Updating status to 'ONLINE'.`
+    );
+    await repository.updateStatus(workerExist.id, WorkerStatus.ONLINE);
     return;
   }
 
-  await repository.createWorker(workerName, WorkerStatus.IDLE);
-  console.log(`Worker with name ${workerName} created and set to 'active'.`);
+  await repository.createWorker(workerName, WorkerStatus.ONLINE);
+  console.log(`Worker with name ${workerName} created and set to 'ONLINE'.`);
   return;
 }

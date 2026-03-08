@@ -57,8 +57,8 @@ export class WhatsAppWebProvider implements MessageProvider {
         null;
       entry.onReady?.(phone);
     });
-    client.on("disconnected", () => {
-      console.log(`Provider disconnected event for sender ${senderId}`);
+    client.on("disconnected", (reason: string) => {
+      console.warn(`Provider disconnected for sender ${senderId}: ${reason}`);
       entry.initializing = false;
       entry.onDisconnect?.();
     });
@@ -70,7 +70,9 @@ export class WhatsAppWebProvider implements MessageProvider {
       console.log(`Provider authenticated event for sender ${senderId}`);
     });
     client.on("loading_screen", (percent: number, message: string) => {
-      console.log(`Provider loading ${percent}% for sender ${senderId}: ${message}`);
+      console.log(
+        `Provider loading ${percent}% for sender ${senderId}: ${message}`
+      );
     });
     client.on("change_state", (state: string) => {
       console.log(`Provider state change for sender ${senderId}: ${state}`);
@@ -87,7 +89,7 @@ export class WhatsAppWebProvider implements MessageProvider {
 
     console.log(`Initializing WhatsApp client for sender ${senderId}`);
     try {
-      client.initialize();
+      await client.initialize();
       console.log(`WhatsApp client initialize called for sender ${senderId}`);
     } catch (error) {
       entry.initializing = false;
@@ -147,7 +149,11 @@ export class WhatsAppWebProvider implements MessageProvider {
 
   async getState(senderId: number): Promise<string | null> {
     const entry = this.clients.get(senderId);
-    if (!entry?.client) {
+    if (!entry?.client || entry.initializing) {
+      return null;
+    }
+    const clientAny = entry.client as any;
+    if (!clientAny?.pupPage) {
       return null;
     }
     try {

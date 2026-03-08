@@ -18,7 +18,7 @@ export class SenderService {
 
   async syncQrRequiredSenders(): Promise<void> {
     const senders = await this.repository.listByStatus(
-      SenderAccountStatus.QR_REQUIRED
+      SenderAccountStatus.WAITING_QR
     );
     if (!senders.length) {
       return;
@@ -32,11 +32,11 @@ export class SenderService {
         });
         this.provider.onReady?.(sender.id, async (phoneNumber) => {
           console.log(`Sender ${sender.id} is ready: ${phoneNumber ?? "unknown"}`);
-          await this.repository.updateStatus(sender.id, SenderAccountStatus.READY);
+          await this.repository.updateStatus(sender.id, SenderAccountStatus.CONNECTED);
         });
         this.provider.onDisconnect?.(sender.id, async () => {
           console.log(`Sender ${sender.id} disconnected`);
-          await this.repository.updateStatus(sender.id, SenderAccountStatus.COOLDOWN);
+          await this.repository.updateStatus(sender.id, SenderAccountStatus.DISCONNECTED);
         });
         await this.cleanupAuthState(sender.id);
         await this.provider.initialize(sender.id);
@@ -50,10 +50,10 @@ export class SenderService {
     });
     this.provider.onReady?.(senderId, async (phoneNumber) => {
       console.log(`Sender ${senderId} is ready: ${phoneNumber ?? "unknown"}`);
-      await this.repository.updateStatus(senderId, SenderAccountStatus.READY);
+      await this.repository.updateStatus(senderId, SenderAccountStatus.CONNECTED);
     });
     this.provider.onDisconnect?.(senderId, async () => {
-      await this.repository.updateStatus(senderId, SenderAccountStatus.COOLDOWN);
+      await this.repository.updateStatus(senderId, SenderAccountStatus.DISCONNECTED);
     });
     await this.cleanupAuthState(senderId);
     await this.provider.initialize(senderId);

@@ -8,7 +8,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const form = document.getElementById("message-form");
     const formTitle = document.getElementById("form-title");
     const recipientInput = document.getElementById("recipient");
-    const payloadInput = document.getElementById("payload");
+    const contentInput = document.getElementById("content");
     const cancelBtn = document.getElementById("cancel-btn");
 
     if (!campaignId) {
@@ -24,7 +24,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (res.ok) {
                 const msg = await res.json();
                 recipientInput.value = msg.recipient;
-                payloadInput.value = msg.payload;
+            contentInput.value = msg.content;
             }
         } catch { }
     } else {
@@ -35,7 +35,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         e.preventDefault();
         const data = {
             recipient: recipientInput.value,
-            payload: payloadInput.value,
+            content: contentInput.value,
             campaign_id: campaignId
         };
         let url = "/messages";

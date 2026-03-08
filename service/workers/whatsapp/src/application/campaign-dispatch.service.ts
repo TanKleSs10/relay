@@ -1,12 +1,11 @@
 import type { MessageProvider } from "../domain/message-provider.interface";
 import { SenderAccountStatus } from "../domain/enums";
 import type { SenderAccountRepository } from "../domain/sender-account.repository.interface";
-import type { WorkerRepository } from "../domain/worker.repository.interface";
 import { CampaignRepository } from "../infrastructure/repositories/campaign.repository";
 import { MessageRepository, type MessageRow } from "../infrastructure/repositories/message.repository";
 
 const MAX_MESSAGES_PER_TICK = 12;
-const MAX_PER_SENDER_PER_TICK = 3;
+const MAX_PER_SENDER_PER_TICK = 1;
 const LOW_QUEUE_THRESHOLD = 50;
 const FAST_DELAY_RANGE = { min: 150, max: 400 };
 const SLOW_DELAY_RANGE = { min: 400, max: 900 };
@@ -15,66 +14,79 @@ const MAX_CONSECUTIVE_FAILURES = 3;
 export class CampaignDispatchService {
   private provider: MessageProvider;
   private senderRepository: SenderAccountRepository;
-  private workerRepository: WorkerRepository;
   private campaignRepository: CampaignRepository;
   private messageRepository: MessageRepository;
   private failureStreaks = new Map<number, number>();
+  private cachedCampaignId: number | null = null;
+  private cachedQueue: MessageRow[] = [];
+  private roundRobinIndex = 0;
+  private sentRecipients = new Set<string>();
 
   constructor(
     provider: MessageProvider,
     senderRepository: SenderAccountRepository,
-    workerRepository: WorkerRepository,
     messageRepository: MessageRepository,
     campaignRepository: CampaignRepository
   ) {
     this.provider = provider;
     this.senderRepository = senderRepository;
-    this.workerRepository = workerRepository;
     this.messageRepository = messageRepository;
     this.campaignRepository = campaignRepository;
   }
 
-  async dispatchOnce(workerName: string): Promise<void> {
+  async dispatchOnce(): Promise<void> {
     try {
-      const worker = await this.workerRepository.findByName(workerName);
-      if (!worker?.currentCampaignId) {
-        console.log(`Dispatch skip: worker ${workerName} has no campaign`);
+      const campaignId = await this.campaignRepository.getActiveCampaignId();
+      if (!campaignId) {
+        console.log("Dispatch skip: no ACTIVE campaign");
         return;
+      }
+
+      if (this.cachedCampaignId !== campaignId) {
+        this.cachedCampaignId = campaignId;
+        this.cachedQueue = [];
+        this.roundRobinIndex = 0;
+        this.sentRecipients.clear();
       }
 
       const senders = await this.senderRepository.listByStatus(
-        SenderAccountStatus.READY
+        SenderAccountStatus.CONNECTED
       );
       if (!senders.length) {
         console.log(
-          `Dispatch skip: no READY senders for campaign ${worker.currentCampaignId}`
+          `Dispatch skip: no CONNECTED senders for campaign ${worker.currentCampaignId}`
         );
         return;
       }
 
-      const messages = await this.messageRepository.listQueuedByCampaign(
-        worker.currentCampaignId,
-        MAX_MESSAGES_PER_TICK
-      );
-      if (!messages.length) {
-        console.log(
-          `Dispatch skip: no queued messages for campaign ${worker.currentCampaignId}`
+      if (this.cachedQueue.length === 0) {
+        this.cachedQueue = await this.messageRepository.reserveQueuedByCampaign(
+          campaignId,
+          MAX_MESSAGES_PER_TICK
         );
-        await this.completeCampaign(worker.id, worker.currentCampaignId);
-        return;
+        console.log(
+          `Reserved ${this.cachedQueue.length} queued messages for campaign ${campaignId}`
+        );
+        if (!this.cachedQueue.length) {
+          console.log(
+            `Dispatch skip: no queued messages for campaign ${campaignId}`
+          );
+          await this.completeCampaign(campaignId);
+          return;
+        }
       }
 
       const senderLimit = Math.max(1, senders.length) * MAX_PER_SENDER_PER_TICK;
-      const allowedCount = Math.min(messages.length, senderLimit);
-      const batch = messages.slice(0, allowedCount);
+      const allowedCount = Math.min(this.cachedQueue.length, senderLimit);
+      const batch = this.cachedQueue.splice(0, allowedCount);
       console.log(
-        `Dispatching ${batch.length} messages for campaign ${worker.currentCampaignId}`
+        `Dispatching ${batch.length} messages for campaign ${campaignId}`
       );
       console.log(
-        `Dispatch limits: max_per_tick=${MAX_MESSAGES_PER_TICK}, max_per_sender=${MAX_PER_SENDER_PER_TICK}, senders_ready=${senders.length}, queued=${messages.length}`
+        `Dispatch limits: max_per_tick=${MAX_MESSAGES_PER_TICK}, max_per_sender=${MAX_PER_SENDER_PER_TICK}, senders_ready=${senders.length}, queued_batch=${batch.length}`
       );
       const delayRange =
-        messages.length <= LOW_QUEUE_THRESHOLD
+        batch.length <= LOW_QUEUE_THRESHOLD
           ? FAST_DELAY_RANGE
           : SLOW_DELAY_RANGE;
       console.log(
@@ -82,18 +94,52 @@ export class CampaignDispatchService {
       );
       const perSenderCount = new Map<number, number>();
       for (const message of batch) {
-        const sender = pickSender(senders, perSenderCount, MAX_PER_SENDER_PER_TICK);
+        const normalizedRecipient = normalizeRecipientForDedup(message.recipient);
+        if (this.sentRecipients.has(normalizedRecipient)) {
+          await this.messageRepository.markFailed(
+            message.id,
+            "duplicate recipient in campaign"
+          );
+          console.warn(
+            `Skipping duplicate recipient ${message.recipient} for message ${message.id}`
+          );
+          continue;
+        }
+        const sender = pickSender(
+          senders,
+          perSenderCount,
+          MAX_PER_SENDER_PER_TICK,
+          this.roundRobinIndex
+        );
         if (!sender) {
           console.warn("Dispatch stopped: no available senders for this tick");
           break;
         }
+        this.roundRobinIndex =
+          (this.roundRobinIndex + 1) % Math.max(1, senders.length);
         await sleep(randomInt(delayRange.min, delayRange.max));
         console.log(
           `Sending message ${message.id} via sender ${sender.id} to ${message.recipient}`
         );
+        const normalizedRecipient = normalizeRecipientForDedup(message.recipient);
+        const alreadySent = await this.messageRepository.hasSentRecipient(
+          campaignId,
+          normalizedRecipient
+        );
+        if (alreadySent) {
+          await this.messageRepository.markFailed(
+            message.id,
+            "duplicate recipient already sent"
+          );
+          console.warn(
+            `Skipping message ${message.id} because recipient ${message.recipient} was already sent`
+          );
+          continue;
+        }
         const sent = await this.sendWithSender(sender.id, message);
         if (sent) {
           this.failureStreaks.set(sender.id, 0);
+          this.sentRecipients.add(normalizedRecipient);
         } else {
           const streak = (this.failureStreaks.get(sender.id) ?? 0) + 1;
           this.failureStreaks.set(sender.id, streak);
@@ -115,10 +161,10 @@ export class CampaignDispatchService {
           }
         }
       }
-      await this.completeCampaign(worker.id, worker.currentCampaignId);
+      await this.completeCampaign(campaignId);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      console.error(`Dispatch failed for worker ${workerName}: ${message}`);
+      console.error(`Dispatch failed: ${message}`);
     }
   }
 
@@ -127,9 +173,28 @@ export class CampaignDispatchService {
     message: MessageRow
   ): Promise<boolean> {
     try {
-      await this.provider.sendMessage(senderId, message.recipient, message.payload);
+      await this.senderRepository.updateStatus(
+        senderId,
+        SenderAccountStatus.SENDING
+      );
+      if (process.env.DRY_RUN === "1") {
+        console.log(
+          `DRY_RUN: skipping send for message ${message.id} to ${message.recipient} via sender ${senderId}`
+        );
+        await this.messageRepository.markSent(message.id);
+        await this.senderRepository.updateStatus(
+          senderId,
+          SenderAccountStatus.CONNECTED
+        );
+        return true;
+      }
+      await this.provider.sendMessage(senderId, message.recipient, message.content);
       await this.messageRepository.markSent(message.id);
       console.log(`Message ${message.id} marked SENT`);
+      await this.senderRepository.updateStatus(
+        senderId,
+        SenderAccountStatus.CONNECTED
+      );
       return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -140,11 +205,15 @@ export class CampaignDispatchService {
       } else if (error.stack) {
         console.error(error.stack);
       }
+      await this.senderRepository.updateStatus(
+        senderId,
+        SenderAccountStatus.CONNECTED
+      );
       return false;
     }
   }
 
-  private async completeCampaign(workerId: number, campaignId: number): Promise<void> {
+  private async completeCampaign(campaignId: number): Promise<void> {
     const remaining = await this.messageRepository.countQueuedByCampaign(
       campaignId
     );
@@ -156,25 +225,30 @@ export class CampaignDispatchService {
     }
     const failed = await this.messageRepository.countFailedByCampaign(campaignId);
     if (failed > 0) {
-      await this.campaignRepository.markFailed(campaignId);
+      await this.campaignRepository.markPaused(campaignId);
       console.log(
-        `Campaign ${campaignId} marked FAILED with ${failed} failed messages`
+        `Campaign ${campaignId} marked PAUSED with ${failed} failed messages`
       );
     } else {
       await this.campaignRepository.markDone(campaignId);
-      console.log(`Campaign ${campaignId} marked DONE`);
+      console.log(`Campaign ${campaignId} marked FINISHED`);
     }
-    await this.workerRepository.clearCampaign(workerId);
-    console.log(`Worker ${workerId} cleared for campaign ${campaignId}`);
+    console.log(`Campaign ${campaignId} completed`);
   }
 }
 
 function pickSender(
   senders: { id: number }[],
   perSenderCount: Map<number, number>,
-  maxPerSender: number
+  maxPerSender: number,
+  startIndex: number
 ): { id: number } | null {
-  for (const sender of senders) {
+  if (!senders.length) {
+    return null;
+  }
+  for (let offset = 0; offset < senders.length; offset += 1) {
+    const index = (startIndex + offset) % senders.length;
+    const sender = senders[index];
     const current = perSenderCount.get(sender.id) ?? 0;
     if (current < maxPerSender) {
       perSenderCount.set(sender.id, current + 1);
@@ -190,4 +264,15 @@ function sleep(ms: number): Promise<void> {
 
 function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function normalizeRecipientForDedup(recipient: string): string {
+  const digits = recipient.replace(/[^\d]/g, "");
+  if (digits.length === 10) {
+    return `521${digits}`;
+  }
+  if (digits.length === 12 && digits.startsWith("52") && !digits.startsWith("521")) {
+    return `521${digits.slice(2)}`;
+  }
+  return digits || recipient;
 }

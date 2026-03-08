@@ -4,28 +4,37 @@ export enum Provider {
 
 export enum CampaignStatus {
   CREATED = "CREATED",
-  QUEUED = "QUEUED",
-  PROCESSING = "PROCESSING",
-  DONE = "DONE",
-  FAILED = "FAILED",
+  ACTIVE = "ACTIVE",
+  PAUSED = "PAUSED",
+  FINISHED = "FINISHED",
 }
 
 export enum MessageStatus {
-  QUEUED = "QUEUED",
+  PENDING = "PENDING",
+  PROCESSING = "PROCESSING",
   SENT = "SENT",
   FAILED = "FAILED",
-  RETRY = "RETRY",
 }
 
 export enum SenderAccountStatus {
-  QR_REQUIRED = "QR_REQUIRED",
-  READY = "READY",
+  CREATED = "CREATED",
+  INITIALIZING = "INITIALIZING",
+  WAITING_QR = "WAITING_QR",
+  CONNECTED = "CONNECTED",
+  SENDING = "SENDING",
   COOLDOWN = "COOLDOWN",
+  DISCONNECTED = "DISCONNECTED",
   BLOCKED = "BLOCKED",
+  ERROR = "ERROR",
 }
 
 export enum WorkerStatus {
-  IDLE = "IDLE",
-  RUNNING = "RUNNING",
-  ERROR = "ERROR",
+  ONLINE = "ONLINE",
+  OFFLINE = "OFFLINE",
+}
+
+export enum WorkerType {
+  QR = "qr",
+  SESSION = "session",
+  CAMPAIGN = "campaign",
 }
