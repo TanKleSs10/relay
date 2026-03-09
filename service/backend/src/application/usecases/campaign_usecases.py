@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
@@ -11,7 +13,6 @@ from src.api.service.campaigns import (
     list_campaigns,
     update_campaign as update_campaign_service,
 )
-from src.api.service.workers import assign_campaign, get_idle_worker
 from src.api.service.messages import create_messages, reset_messages_by_campaign
 from src.domain.models import Campaign
 from src.domain import CampaignStatus
@@ -27,8 +28,8 @@ def _ensure_unique_campaign_name(db: Session, name: str) -> None:
 
 def _extract_message_row(row: dict[str, object]) -> tuple[str | None, str | None]:
     recipient = row.get("phone") or row.get("recipient") or row.get("phone_number")
-    payload = row.get("message") or row.get("payload") or row.get("text")
-    return recipient, payload
+    content = row.get("message") or row.get("payload") or row.get("text")
+    return recipient, content
 
 
 def create_campaign_with_file(name: str, file: UploadFile | None, db: Session):
@@ -53,16 +54,21 @@ def create_campaign_with_file(name: str, file: UploadFile | None, db: Session):
         invalid_rows: list[dict[str, object]] = []
 
         for idx, row in enumerate(data, start=1):
-            recipient, payload = _extract_message_row(row)
+            recipient, content = _extract_message_row(row)
 
-            if not recipient or not payload:
+            if not recipient or not content:
                 invalid_rows.append({"row": idx, "data": row})
                 continue
 
-            create_messages(
-                db, recipient=recipient, payload=payload, campaign_id=campaign.id
+            message = create_messages(
+                db,
+                recipient=recipient,
+                content=content,
+                campaign_id=campaign.id,
+                allow_duplicate=True,
             )
-            created += 1
+            if message:
+                created += 1
 
         db.commit()
         db.refresh(campaign)
@@ -78,10 +84,10 @@ def create_campaigns(db: Session, payload: CampaignCreate) -> Campaign:
 
         if payload.status and payload.status not in {
             CampaignStatus.CREATED,
-            CampaignStatus.QUEUED,
+            CampaignStatus.PAUSED,
         }:
             raise ConflictError(
-                "Campaign status can only start as CREATED or QUEUED"
+                "Campaign status can only start as CREATED or PAUSED"
             )
 
         campaign = create_campaign(db, payload)
@@ -128,8 +134,8 @@ def remove_campaign(campaign_id: int, db: Session):
     campaign = get_campaign_by_id(db, campaign_id)
     if not campaign:
         raise NotFoundError("Campaign not found")
-    if campaign.status == CampaignStatus.PROCESSING:
-        raise ConflictError("Cannot delete a campaign that is currently processing")
+    if campaign.status == CampaignStatus.ACTIVE:
+        raise ConflictError("Cannot delete a campaign that is currently active")
     try:
         delete_campaign(db, campaign)
         db.commit()
@@ -146,20 +152,40 @@ def dispatch_campaign(campaign_id: int, db: Session) -> dict[str, int]:
     campaign = get_campaign_by_id(db, campaign_id)
     if not campaign:
         raise NotFoundError("Campaign not found")
-    if not can_transition(campaign.status, CampaignStatus.PROCESSING):
+    if not can_transition(campaign.status, CampaignStatus.ACTIVE):
         raise ConflictError(
-            f"Campaign cannot be dispatched from status {campaign.status}"
+            f"Campaign cannot be activated from status {campaign.status}"
         )
-
-    worker = get_idle_worker(db)
-    if not worker:
-        raise ConflictError("No idle workers available")
+    active = (
+        db.query(Campaign)
+        .filter(Campaign.status == CampaignStatus.ACTIVE, Campaign.id != campaign_id)
+        .first()
+    )
+    if active:
+        raise ConflictError("Another campaign is already ACTIVE")
 
     try:
-        campaign.status = CampaignStatus.PROCESSING
-        assign_campaign(db, worker, campaign_id)
+        campaign.status = CampaignStatus.ACTIVE
+        campaign.started_at = datetime.utcnow()
         db.commit()
-        return {"worker_id": worker.id}
+        return {"campaign_id": campaign.id}
+    except Exception as exc:
+        db.rollback()
+        raise exc
+
+
+def pause_campaign(campaign_id: int, db: Session) -> dict[str, int]:
+    campaign = get_campaign_by_id(db, campaign_id)
+    if not campaign:
+        raise NotFoundError("Campaign not found")
+    if not can_transition(campaign.status, CampaignStatus.PAUSED):
+        raise ConflictError(
+            f"Campaign cannot be paused from status {campaign.status}"
+        )
+    try:
+        campaign.status = CampaignStatus.PAUSED
+        db.commit()
+        return {"campaign_id": campaign.id}
     except Exception as exc:
         db.rollback()
         raise exc
@@ -169,13 +195,21 @@ def retry_campaign(campaign_id: int, db: Session) -> dict[str, int]:
     campaign = get_campaign_by_id(db, campaign_id)
     if not campaign:
         raise NotFoundError("Campaign not found")
-    if not can_transition(campaign.status, CampaignStatus.QUEUED):
+    if not can_transition(campaign.status, CampaignStatus.ACTIVE):
         raise ConflictError(
             f"Campaign cannot be retried from status {campaign.status}"
         )
+    active = (
+        db.query(Campaign)
+        .filter(Campaign.status == CampaignStatus.ACTIVE, Campaign.id != campaign_id)
+        .first()
+    )
+    if active:
+        raise ConflictError("Another campaign is already ACTIVE")
+
     try:
         reset_count = reset_messages_by_campaign(db, campaign_id)
-        campaign.status = CampaignStatus.QUEUED
+        campaign.status = CampaignStatus.ACTIVE
         db.commit()
         return {"reset_messages": reset_count}
     except Exception as exc:

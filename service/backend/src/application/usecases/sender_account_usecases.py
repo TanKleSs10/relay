@@ -9,6 +9,7 @@ from src.api.service.sender_accounts import (
     delete_sender_account,
     get_sender_account_by_id,
     list_sender_accounts,
+    reset_sender_session,
     update_sender_account,
 )
 from src.domain import SenderAccount
@@ -56,6 +57,20 @@ def update_sender(
         raise NotFoundError("Sender account not found")
     try:
         sender = update_sender_account(db, sender, payload)
+        db.commit()
+        db.refresh(sender)
+        return sender
+    except Exception as exc:
+        db.rollback()
+        raise exc
+
+
+def reset_sender(sender_id: int, db: Session) -> SenderAccount:
+    sender = get_sender_account_by_id(db, sender_id)
+    if not sender:
+        raise NotFoundError("Sender account not found")
+    try:
+        sender = reset_sender_session(db, sender)
         db.commit()
         db.refresh(sender)
         return sender

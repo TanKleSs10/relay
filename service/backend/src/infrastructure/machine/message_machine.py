@@ -5,12 +5,14 @@ from typing import Final
 from src.domain import MessageStatus
 
 _ALLOWED_TRANSITIONS: Final[dict[MessageStatus, set[MessageStatus]]] = {
-    MessageStatus.QUEUED: {
+    MessageStatus.PENDING: {
+        MessageStatus.PROCESSING,
+        MessageStatus.FAILED,
+    },
+    MessageStatus.PROCESSING: {
         MessageStatus.SENT,
         MessageStatus.FAILED,
-        MessageStatus.RETRY,
     },
-    MessageStatus.RETRY: {MessageStatus.SENT, MessageStatus.FAILED},
     MessageStatus.SENT: set(),
     MessageStatus.FAILED: set(),
 }

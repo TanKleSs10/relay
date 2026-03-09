@@ -3,14 +3,13 @@ from src.domain.models import (
     CampaignStatus,
     Message,
     MessageStatus,
-    Provider,
     SendLog,
     SendRule,
     SenderAccount,
     SenderAccountStatus,
-    TemplateVariable,
-    WorkerState,
     WorkerStatus,
+    WorkerType,
+    Worker,
 )
 
 __all__ = [
@@ -18,12 +17,11 @@ __all__ = [
     "CampaignStatus",
     "Message",
     "MessageStatus",
-    "Provider",
     "SendLog",
     "SendRule",
     "SenderAccount",
     "SenderAccountStatus",
-    "TemplateVariable",
-    "WorkerState",
     "WorkerStatus",
+    "WorkerType",
+    "Worker",
 ]

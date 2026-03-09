@@ -3,17 +3,17 @@ from __future__ import annotations
 from src.domain.models import (
     CampaignStatus,
     MessageStatus,
-    Provider,
     SenderAccountStatus,
     WorkerStatus,
+    WorkerType,
 )
 
 ENUM_REGISTRY = {
     "campaign_status": CampaignStatus,
     "message_status": MessageStatus,
-    "provider": Provider,
     "sender_account_status": SenderAccountStatus,
     "worker_status": WorkerStatus,
+    "worker_type": WorkerType,
 }
 
 

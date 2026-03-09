@@ -10,7 +10,7 @@ export async function connectDB(): Promise<PoolType> {
   }
 
   const connectionString = envs.URL_DB;
-
+  console.log("Connecting to the database...", connectionString);
   if (!connectionString) {
     throw new Error("DB_URL_WORKER or DB_URL must be set");
   }

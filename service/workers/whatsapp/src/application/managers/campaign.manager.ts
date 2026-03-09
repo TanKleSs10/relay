@@ -1,0 +1,342 @@
+import type { MessageProvider } from "../../domain/interfaces/message-provider.interface";
+import { SenderAccountStatus } from "../../domain/enums";
+import type { SenderRepository } from "../../domain/interfaces/sender.repository.interface";
+import { CampaignRepository } from "../../infrastructure/repositories/campaign.repository";
+import {
+  MessageRepository,
+  type MessageRow,
+} from "../../infrastructure/repositories/message.repository";
+import { SendLogRepository } from "../../infrastructure/repositories/send-log.repository";
+import { randomDelay } from "../../utils/delay";
+import type { Logger } from "../../utils/logger";
+
+const MAX_MESSAGES_PER_TICK = 12;
+const MAX_PER_SENDER_PER_TICK = 1;
+const LOW_QUEUE_THRESHOLD = 50;
+const FAST_DELAY_RANGE = { min: 150, max: 400 };
+const SLOW_DELAY_RANGE = { min: 400, max: 900 };
+const MAX_CONSECUTIVE_FAILURES = 3;
+const MAX_INIT_RETRIES = 3;
+
+export class CampaignManager {
+  private failureStreaks = new Map<number, number>();
+  private cachedCampaignId: number | null = null;
+  private cachedQueue: MessageRow[] = [];
+  private roundRobinIndex = 0;
+  private sentKeys = new Set<string>();
+  private lastNoActiveLogAt = 0;
+
+  constructor(
+    private provider: MessageProvider,
+    private senderRepository: SenderRepository,
+    private messageRepository: MessageRepository,
+    private campaignRepository: CampaignRepository,
+    private logger: Logger,
+    private workerId: number,
+    private sendLogRepository: SendLogRepository
+  ) {}
+
+  async dispatchOnce(): Promise<void> {
+    try {
+      const campaignId = await this.campaignRepository.getActiveCampaignId();
+      if (!campaignId) {
+        const now = Date.now();
+        if (now - this.lastNoActiveLogAt > 10_000) {
+          this.logger.info("dispatch skip: no ACTIVE campaign");
+          this.lastNoActiveLogAt = now;
+        }
+        return;
+      }
+
+      if (this.cachedCampaignId !== campaignId) {
+        this.cachedCampaignId = campaignId;
+        this.cachedQueue = [];
+        this.roundRobinIndex = 0;
+        this.sentKeys.clear();
+      }
+
+      const senders = await this.senderRepository.listByStatus(
+        SenderAccountStatus.CONNECTED
+      );
+      if (!senders.length) {
+        this.logger.warn(
+          `dispatch skip: no CONNECTED senders for campaign ${campaignId}`
+        );
+        return;
+      }
+
+      if (this.cachedQueue.length === 0) {
+        this.cachedQueue = await this.messageRepository.claimNextBatch(
+          campaignId,
+          this.workerId,
+          MAX_MESSAGES_PER_TICK
+        );
+        this.logger.info(
+          `reserved ${this.cachedQueue.length} queued messages for campaign ${campaignId}`
+        );
+        if (!this.cachedQueue.length) {
+          this.logger.info(
+            `dispatch skip: no queued messages for campaign ${campaignId}`
+          );
+          await this.completeCampaign(campaignId);
+          return;
+        }
+      }
+
+      const senderLimit = Math.max(1, senders.length) * MAX_PER_SENDER_PER_TICK;
+      const allowedCount = Math.min(this.cachedQueue.length, senderLimit);
+      const batch = this.cachedQueue.splice(0, allowedCount);
+      this.logger.info(`dispatching ${batch.length} messages for campaign ${campaignId}`);
+      this.logger.info(
+        `limits: max_per_tick=${MAX_MESSAGES_PER_TICK}, max_per_sender=${MAX_PER_SENDER_PER_TICK}, senders_ready=${senders.length}, queued_batch=${batch.length}`
+      );
+      const delayRange =
+        batch.length <= LOW_QUEUE_THRESHOLD
+          ? FAST_DELAY_RANGE
+          : SLOW_DELAY_RANGE;
+      this.logger.info(
+        `delay range: ${delayRange.min}-${delayRange.max}ms`
+      );
+      const perSenderCount = new Map<number, number>();
+      for (const message of batch) {
+        const sender = pickSender(
+          senders,
+          perSenderCount,
+          MAX_PER_SENDER_PER_TICK,
+          this.roundRobinIndex
+        );
+        if (!sender) {
+          this.logger.warn("dispatch stopped: no available senders for this tick");
+          break;
+        }
+        this.roundRobinIndex =
+          (this.roundRobinIndex + 1) % Math.max(1, senders.length);
+        const normalizedRecipient = normalizeRecipientForDedup(message.recipient);
+        const dedupeKey = message.idempotency_key ?? normalizedRecipient;
+        if (this.sentKeys.has(dedupeKey)) {
+          await this.messageRepository.markFailed(
+            message.id,
+            "duplicate recipient content in campaign",
+            sender.id
+          );
+          await this.sendLogRepository.create({
+            messageId: message.id,
+            senderId: sender.id,
+            workerId: this.workerId,
+            status: "FAILED",
+            errorMessage: "duplicate recipient content in campaign",
+          });
+          this.logger.warn(
+            `skip duplicate message for recipient ${message.recipient} (id ${message.id})`
+          );
+          continue;
+        }
+        await randomDelay(delayRange.min, delayRange.max);
+        this.logger.info(
+          `sending message ${message.id} via sender ${sender.id} to ${message.recipient}`
+        );
+        const alreadySent = await this.messageRepository.hasSentIdempotency(
+          campaignId,
+          message.idempotency_key ?? null,
+          normalizedRecipient
+        );
+        if (alreadySent) {
+          await this.messageRepository.markFailed(
+            message.id,
+            "duplicate recipient content already sent",
+            sender.id
+          );
+          await this.sendLogRepository.create({
+            messageId: message.id,
+            senderId: sender.id,
+            workerId: this.workerId,
+            status: "FAILED",
+            errorMessage: "duplicate recipient content already sent",
+          });
+          this.logger.warn(
+            `skip message ${message.id}; recipient content already sent`
+          );
+          continue;
+        }
+        const result = await this.sendWithSender(sender.id, message);
+        if (result.sent) {
+          this.failureStreaks.set(sender.id, 0);
+          this.sentKeys.add(dedupeKey);
+        } else {
+          if (result.avoidCooldown) {
+            this.failureStreaks.set(sender.id, 0);
+            continue;
+          }
+          const streak = (this.failureStreaks.get(sender.id) ?? 0) + 1;
+          this.failureStreaks.set(sender.id, streak);
+          if (streak >= MAX_CONSECUTIVE_FAILURES) {
+            this.logger.warn(
+              `sender ${sender.id} entered COOLDOWN after ${streak} failures`
+            );
+            try {
+              await this.senderRepository.updateStatus(
+                sender.id,
+                SenderAccountStatus.COOLDOWN
+              );
+            } catch (error) {
+              this.logger.error(
+                `failed to set COOLDOWN for sender ${sender.id}`,
+                error
+              );
+            }
+          }
+        }
+      }
+      await this.completeCampaign(campaignId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      this.logger.error(`dispatch failed: ${message}`);
+    }
+  }
+
+  private async sendWithSender(
+    senderId: number,
+    message: MessageRow
+  ): Promise<{ sent: boolean; avoidCooldown: boolean }> {
+    try {
+      await this.senderRepository.updateStatus(
+        senderId,
+        SenderAccountStatus.SENDING
+      );
+      if (process.env.DRY_RUN === "1") {
+        console.log(
+          `DRY_RUN: skipping send for message ${message.id} to ${message.recipient} via sender ${senderId}`
+        );
+        await this.messageRepository.markSent(message.id, senderId);
+        await this.sendLogRepository.create({
+          messageId: message.id,
+          senderId,
+          workerId: this.workerId,
+          status: "SENT",
+        });
+        await this.senderRepository.updateStatus(
+          senderId,
+          SenderAccountStatus.CONNECTED
+        );
+        return { sent: true, avoidCooldown: false };
+      }
+      await this.provider.sendMessage(senderId, message.recipient, message.content);
+      await this.messageRepository.markSent(message.id, senderId);
+      await this.sendLogRepository.create({
+        messageId: message.id,
+        senderId,
+        workerId: this.workerId,
+        status: "SENT",
+      });
+      this.logger.info(`message ${message.id} marked SENT`);
+      await this.senderRepository.updateStatus(
+        senderId,
+        SenderAccountStatus.CONNECTED
+      );
+      return { sent: true, avoidCooldown: false };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      await this.messageRepository.markFailed(message.id, errorMessage, senderId);
+      await this.sendLogRepository.create({
+        messageId: message.id,
+        senderId,
+        workerId: this.workerId,
+        status: "FAILED",
+        errorMessage,
+      });
+      this.logger.error(`message ${message.id} failed: ${errorMessage}`);
+      if (errorMessage.toLowerCase().includes("not initialized")) {
+        if ((message.retry_count ?? 0) >= MAX_INIT_RETRIES) {
+          this.logger.warn(`message ${message.id} exceeded init retries`);
+          await this.messageRepository.markFailed(
+            message.id,
+            "sender not initialized retry limit",
+            senderId
+          );
+          await this.sendLogRepository.create({
+            messageId: message.id,
+            senderId,
+            workerId: this.workerId,
+            status: "FAILED",
+            errorMessage: "sender not initialized retry limit",
+          });
+          return { sent: false, avoidCooldown: true };
+        }
+        this.logger.warn(`sender ${senderId} session reset required`);
+        try {
+          await this.senderRepository.resetSession(senderId);
+          await this.provider.clear?.(senderId);
+          await this.messageRepository.markPending(message.id);
+        } catch (resetError) {
+          this.logger.error(`failed to reset sender ${senderId}`, resetError);
+        }
+        return { sent: false, avoidCooldown: true };
+      }
+      if (!(error instanceof Error)) {
+        this.logger.error(`message ${message.id} error value:`, error);
+      } else if (error.stack) {
+        this.logger.error(error.stack);
+      }
+      await this.senderRepository.updateStatus(
+        senderId,
+        SenderAccountStatus.CONNECTED
+      );
+      return { sent: false, avoidCooldown: false };
+    }
+  }
+
+  private async completeCampaign(campaignId: number): Promise<void> {
+    const remaining = await this.messageRepository.countQueuedByCampaign(
+      campaignId
+    );
+    if (remaining > 0) {
+      this.logger.info(
+        `campaign ${campaignId} still has ${remaining} queued messages`
+      );
+      return;
+    }
+    const failed = await this.messageRepository.countFailedByCampaign(campaignId);
+    if (failed > 0) {
+      await this.campaignRepository.markPaused(campaignId);
+      this.logger.warn(
+        `campaign ${campaignId} marked PAUSED with ${failed} failed messages`
+      );
+    } else {
+      await this.campaignRepository.markDone(campaignId);
+      this.logger.info(`campaign ${campaignId} marked FINISHED`);
+    }
+    this.logger.info(`campaign ${campaignId} completed`);
+  }
+}
+
+function pickSender(
+  senders: { id: number }[],
+  perSenderCount: Map<number, number>,
+  maxPerSender: number,
+  startIndex: number
+): { id: number } | null {
+  if (!senders.length) {
+    return null;
+  }
+  for (let offset = 0; offset < senders.length; offset += 1) {
+    const index = (startIndex + offset) % senders.length;
+    const sender = senders[index];
+    const current = perSenderCount.get(sender.id) ?? 0;
+    if (current < maxPerSender) {
+      perSenderCount.set(sender.id, current + 1);
+      return sender;
+    }
+  }
+  return null;
+}
+
+function normalizeRecipientForDedup(recipient: string): string {
+  const digits = recipient.replace(/[^\d]/g, "");
+  if (digits.length === 10) {
+    return `521${digits}`;
+  }
+  if (digits.length === 12 && digits.startsWith("52") && !digits.startsWith("521")) {
+    return `521${digits.slice(2)}`;
+  }
+  return digits || recipient;
+}

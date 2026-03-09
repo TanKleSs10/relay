@@ -8,7 +8,7 @@ from src.api.service.workers import (
     count_available_workers,
     reset_worker,
 )
-from src.domain import WorkerState
+from src.domain import Worker
 
 router = APIRouter(prefix="/workers", tags=["workers"])
 
@@ -25,7 +25,7 @@ def get_available_count(db: Session = Depends(get_db)):
 
 @router.post("/{worker_id}/reset")
 def reset_worker_status(worker_id: int, db: Session = Depends(get_db)):
-    worker = db.query(WorkerState).filter(WorkerState.id == worker_id).first()
+    worker = db.query(Worker).filter(Worker.id == worker_id).first()
     if not worker:
         raise NotFoundError("Worker not found")
     reset_worker(db, worker)
