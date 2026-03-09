@@ -236,30 +236,36 @@ export class CampaignManager {
       return { sent: true, avoidCooldown: false };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      await this.messageRepository.markFailed(message.id, errorMessage, senderId);
-      await this.sendLogRepository.create({
-        messageId: message.id,
-        senderId,
-        workerId: this.workerId,
-        status: "FAILED",
-        errorMessage,
-      });
-      this.logger.error(`message ${message.id} failed: ${errorMessage}`);
+      const recordFailure = async (note: string) => {
+        await this.messageRepository.markFailed(message.id, note, senderId);
+        await this.sendLogRepository.create({
+          messageId: message.id,
+          senderId,
+          workerId: this.workerId,
+          status: "FAILED",
+          errorMessage: note,
+        });
+        this.logger.error(`message ${message.id} failed: ${note}`);
+      };
+      const normalizedError = errorMessage.toLowerCase();
+      if (
+        normalizedError.includes("execution context was destroyed") ||
+        normalizedError.includes("target closed")
+      ) {
+        await recordFailure(errorMessage);
+        await this.messageRepository.markPending(message.id);
+        await this.senderRepository.updateStatus(
+          senderId,
+          SenderAccountStatus.DISCONNECTED
+        );
+        await this.provider.clear?.(senderId);
+        return { sent: false, avoidCooldown: true };
+      }
+      await recordFailure(errorMessage);
       if (errorMessage.toLowerCase().includes("not initialized")) {
         if ((message.retry_count ?? 0) >= MAX_INIT_RETRIES) {
           this.logger.warn(`message ${message.id} exceeded init retries`);
-          await this.messageRepository.markFailed(
-            message.id,
-            "sender not initialized retry limit",
-            senderId
-          );
-          await this.sendLogRepository.create({
-            messageId: message.id,
-            senderId,
-            workerId: this.workerId,
-            status: "FAILED",
-            errorMessage: "sender not initialized retry limit",
-          });
+          await recordFailure("sender not initialized retry limit");
           return { sent: false, avoidCooldown: true };
         }
         this.logger.warn(`sender ${senderId} session reset required`);

@@ -103,6 +103,9 @@ export class WhatsAppProvider implements MessageProvider {
     if (!entry?.client) {
       throw new Error(`Sender ${senderId} is not initialized`);
     }
+    if (entry.initializing) {
+      throw new Error(`Sender ${senderId} is initializing`);
+    }
     const recipient = normalizeRecipient(to);
     if (recipient !== to) {
       console.log(`Normalized recipient for sender ${senderId}: ${to} -> ${recipient}`);

@@ -49,21 +49,10 @@ async function syncSessions(
   for (const sender of senders) {
     if (
       sender.status === SenderAccountStatus.CONNECTED ||
-      sender.status === SenderAccountStatus.SENDING ||
       sender.status === SenderAccountStatus.DISCONNECTED
     ) {
       const state = await provider.getState?.(sender.id);
       if (!state) {
-        if (
-          sender.status === SenderAccountStatus.CONNECTED ||
-          sender.status === SenderAccountStatus.SENDING
-        ) {
-          logger.warn(`sender ${sender.id} -> DISCONNECTED (state unavailable)`);
-          await senderRepository.updateStatus(
-            sender.id,
-            SenderAccountStatus.DISCONNECTED
-          );
-        }
         continue;
       }
       if (state === "CONNECTED") {
