@@ -1,6 +1,6 @@
-import type { SenderAccountStatus } from "./enums";
+import type { SenderAccountStatus } from "../enums";
 
-export class SenderAccountEntity {
+export class SenderEntity {
   id: number;
   phoneNumber: string | null;
   status: SenderAccountStatus;
@@ -47,8 +47,8 @@ export class SenderAccountEntity {
     last_sent_at: Date | null;
     created_at: Date;
     updated_at: Date;
-  }): SenderAccountEntity {
-    return new SenderAccountEntity({
+  }): SenderEntity {
+    return new SenderEntity({
       id: row.id,
       phoneNumber: row.phone_number,
       status: row.status,

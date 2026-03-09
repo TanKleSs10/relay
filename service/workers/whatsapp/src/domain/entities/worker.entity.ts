@@ -1,4 +1,4 @@
-import type { WorkerStatus, WorkerType } from "./enums";
+import type { WorkerStatus, WorkerType } from "../enums";
 
 export class WorkerEntity {
   id: number;

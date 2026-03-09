@@ -84,6 +84,7 @@ class Message(Base):
     )
     recipient: Mapped[str] = mapped_column(String(50), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    idempotency_key: Mapped[str | None] = mapped_column(String(64))
     status: Mapped[MessageStatus] = mapped_column(
         SAEnum(MessageStatus, name="message_status"),
         nullable=False,

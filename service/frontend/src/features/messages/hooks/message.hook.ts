@@ -11,14 +11,34 @@ import type { MessagePayload, MessageUpdatePayload } from "../message.types";
 
 export const messageKeys = {
   all: ["messages"] as const,
-  list: () => [...messageKeys.all, "list"] as const,
+  list: (params?: {
+    campaignId?: number;
+    page?: number;
+    limit?: number;
+    status?: string;
+  }) =>
+    [...messageKeys.all, "list", params] as const,
   detail: (messageId: number) => [...messageKeys.all, "detail", messageId] as const,
 };
 
-export const useMessages = () =>
+export const useMessages = (params?: {
+  campaignId?: number;
+  page?: number;
+  limit?: number;
+  status?: string;
+}) =>
   useQuery({
-    queryKey: messageKeys.list(),
-    queryFn: listMessages,
+    queryKey: messageKeys.list(params),
+    queryFn: () =>
+      listMessages({
+        campaignId: params?.campaignId,
+        status: params?.status,
+        skip:
+          typeof params?.page === "number" && typeof params?.limit === "number"
+            ? Math.max(0, params.page - 1) * params.limit
+            : undefined,
+        limit: params?.limit,
+      }),
   });
 
 export const useMessage = (messageId: number) =>

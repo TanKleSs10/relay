@@ -5,6 +5,7 @@ import {
   deleteSenderAccount,
   getSenderAccount,
   listSenderAccounts,
+  resetSenderSession,
 } from "../api/sender-account.api";
 
 export const senderAccountKeys = {
@@ -17,6 +18,7 @@ export const useSenderAccounts = () =>
   useQuery({
     queryKey: senderAccountKeys.list(),
     queryFn: listSenderAccounts,
+    refetchInterval: 3000,
   });
 
 export const useSenderAccount = (senderId: number) =>
@@ -34,4 +36,9 @@ export const useCreateSenderAccount = () =>
 export const useDeleteSenderAccount = () =>
   useMutation({
     mutationFn: (senderId: number) => deleteSenderAccount(senderId),
+  });
+
+export const useResetSenderSession = () =>
+  useMutation({
+    mutationFn: (senderId: number) => resetSenderSession(senderId),
   });

@@ -17,6 +17,7 @@ class MessageRead(APIModel):
     campaign_id: PositiveInt
     recipient: str
     content: str
+    idempotency_key: str | None = None
     status: MessageStatus
     processing_by_worker: PositiveInt | None = None
     processing_sender_id: PositiveInt | None = None

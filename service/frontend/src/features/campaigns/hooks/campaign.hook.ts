@@ -5,6 +5,7 @@ import {
   dispatchCampaign,
   getCampaign,
   listCampaigns,
+  pauseCampaign,
   retryCampaign,
   uploadCampaign,
 } from "../api/campaign.api";
@@ -19,6 +20,7 @@ export const useCampaigns = () =>
   useQuery({
     queryKey: campaignKeys.list(),
     queryFn: listCampaigns,
+    refetchInterval: 5000,
   });
 
 export const useCampaign = (campaignId: number) =>
@@ -36,6 +38,11 @@ export const useDeleteCampaign = () =>
 export const useDispatchCampaign = () =>
   useMutation({
     mutationFn: (campaignId: number) => dispatchCampaign(campaignId),
+  });
+
+export const usePauseCampaign = () =>
+  useMutation({
+    mutationFn: (campaignId: number) => pauseCampaign(campaignId),
   });
 
 export const useRetryCampaign = () =>

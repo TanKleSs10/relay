@@ -16,3 +16,7 @@ export function createSenderAccount() {
 export function deleteSenderAccount(senderId: number) {
   return request(`/sender-accounts/${senderId}`, { method: "DELETE" });
 }
+
+export function resetSenderSession(senderId: number) {
+  return request(`/sender-accounts/${senderId}/reset-session`, { method: "POST" });
+}

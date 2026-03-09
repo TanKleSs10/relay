@@ -48,3 +48,12 @@ def update_sender_account(
     for field, value in updates.items():
         setattr(sender, field, value)
     return sender
+
+
+def reset_sender_session(db: Session, sender: SenderAccount) -> SenderAccount:
+    sender.status = SenderAccountStatus.WAITING_QR
+    sender.phone_number = None
+    sender.qr_code = None
+    sender.qr_generated_at = None
+    sender.session_path = None
+    return sender

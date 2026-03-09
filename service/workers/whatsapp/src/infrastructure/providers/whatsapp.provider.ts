@@ -1,7 +1,7 @@
 import whatsapp from "whatsapp-web.js";
 import type { Client } from "whatsapp-web.js";
 
-import type { MessageProvider } from "../../domain/message-provider.interface";
+import type { MessageProvider } from "../../domain/interfaces/message-provider.interface";
 
 type SenderEntry = {
   client?: Client;
@@ -12,7 +12,7 @@ type SenderEntry = {
 };
 
 // Adapter that isolates whatsapp-web.js usage behind MessageProvider.
-export class WhatsAppWebProvider implements MessageProvider {
+export class WhatsAppProvider implements MessageProvider {
   private clients = new Map<number, SenderEntry>();
 
   async initialize(senderId: number): Promise<void> {

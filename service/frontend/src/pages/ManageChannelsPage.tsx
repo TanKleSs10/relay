@@ -7,7 +7,12 @@ import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Spinner } from "../components/ui/Spinner";
 import type { SenderAccount } from "../schemas";
-import { useCreateSenderAccount, useDeleteSenderAccount, useSenderAccounts } from "../features";
+import {
+  useCreateSenderAccount,
+  useDeleteSenderAccount,
+  useResetSenderSession,
+  useSenderAccounts,
+} from "../features";
 
 const senderStatusLabels: Record<string, string> = {
   CREATED: "Creado",
@@ -26,7 +31,12 @@ export function ManageChannelsPage() {
   const { data: channels = [], isLoading } = useSenderAccounts();
   const createSender = useCreateSenderAccount();
   const deleteSender = useDeleteSenderAccount();
+  const resetSession = useResetSenderSession();
   const [qrModalSender, setQrModalSender] = useState<SenderAccount | null>(null);
+
+  const modalSender = qrModalSender
+    ? channels.find((item) => item.id === qrModalSender.id) || qrModalSender
+    : null;
 
   const channelsList = useMemo(() => {
     if (channels.length === 0) {
@@ -56,9 +66,31 @@ export function ManageChannelsPage() {
               </span>
             </div>
           </div>
-          <div className="channel-row__actions">
-            <Button size="small" variant="tertiary" onClick={() => setQrModalSender(sender)}>
+            <div className="channel-row__actions">
+            <Button
+              size="small"
+              variant="tertiary"
+              disabled={!sender.qr_code}
+              onClick={() => setQrModalSender(sender)}
+            >
               Ver QR
+            </Button>
+            <Button
+              size="small"
+              variant="secondary"
+              onClick={() =>
+                resetSession.mutate(sender.id, {
+                  onSuccess: () => {
+                    queryClient.invalidateQueries({ queryKey: ["sender-accounts"] });
+                    toast.success("Sesión reiniciada");
+                  },
+                  onError: () => {
+                    toast.error("No se pudo reiniciar la sesión");
+                  },
+                })
+              }
+            >
+              Reset sesión
             </Button>
             <Button
               size="small"
@@ -123,7 +155,7 @@ export function ManageChannelsPage() {
       </section>
 
       <div
-        className={`qr-modal ${qrModalSender ? "qr-modal--open" : ""}`}
+        className={`qr-modal ${modalSender ? "qr-modal--open" : ""}`}
         onClick={(event) => {
           if (event.target === event.currentTarget) {
             setQrModalSender(null);
@@ -132,13 +164,13 @@ export function ManageChannelsPage() {
       >
         <div className="qr-modal__content">
           <h3 className="campaigns__title">QR del Canal</h3>
-          {qrModalSender?.qr_code ? (
-            <img className="qr-modal__image" src={qrModalSender.qr_code} alt="QR del canal" />
+          {modalSender?.qr_code ? (
+            <img className="qr-modal__image" src={modalSender.qr_code} alt="QR del canal" />
           ) : (
             <div className="qr-modal__image u-flex u-flex-center u-color-meta">Sin QR disponible</div>
           )}
           <p className="qr-modal__text">
-            {qrModalSender?.qr_code
+            {modalSender?.qr_code
               ? "Escanea este QR para conectar el canal."
               : "Este canal no tiene QR disponible todavía."}
           </p>

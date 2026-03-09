@@ -9,9 +9,10 @@ from src.api.service.messages import (
     create_messages,
     delete_message,
     get_message_by_id,
-    list_messages,
+    list_messages_filtered,
     update_message,
 )
+from src.domain import MessageStatus
 from src.domain.models import Message
 
 
@@ -35,8 +36,16 @@ def create_message(db: Session, payload: MessageCreate) -> Message:
         raise exc
 
 
-def get_messages(db: Session):
-    return list_messages(db)
+def get_messages(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    campaign_id: int | None = None,
+    status: MessageStatus | None = None,
+):
+    return list_messages_filtered(
+        db, campaign_id=campaign_id, status=status, skip=skip, limit=limit
+    )
 
 
 def get_message(message_id: int, db: Session):

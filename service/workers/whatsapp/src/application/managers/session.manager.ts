@@ -1,46 +1,50 @@
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
-import type { Pool } from "pg";
-import type { MessageProvider } from "../domain/message-provider.interface";
-import { SenderAccountStatus } from "../domain/enums";
-import type { SenderAccountEntity } from "../domain/sender-account.entity";
-import { SenderAccountRepository } from "../infrastructure/repositories/sender-account.repository";
-import { createMessageProvider } from "../infrastructure/providers/provider.factory";
+
+import type { MessageProvider } from "../../domain/interfaces/message-provider.interface";
+import { SenderAccountStatus } from "../../domain/enums";
+import type { SenderEntity } from "../../domain/entities/sender.entity";
+import type { SenderRepository } from "../../domain/interfaces/sender.repository.interface";
+import type { Logger } from "../../utils/logger";
 
 const AUTH_DATA_PATH = "/tmp/whatsapp";
 
-export function initSessionManager(pool: Pool, provider?: MessageProvider) {
-  const managerProvider = provider ?? createMessageProvider();
-  const senderRepository = new SenderAccountRepository(pool);
+export class SessionManager {
+  constructor(
+    private provider: MessageProvider,
+    private senderRepository: SenderRepository,
+    private logger: Logger
+  ) {}
 
-  const tick = async () => {
-    const senders = await senderRepository.listAll();
-    await cleanupMissingSenders(managerProvider, senders);
-    await syncSessions(managerProvider, senderRepository, senders);
-  };
-  return { tick };
+  async tick(): Promise<void> {
+    const senders = await this.senderRepository.listAll();
+    await cleanupMissingSenders(this.provider, senders, this.logger);
+    await syncSessions(this.provider, this.senderRepository, senders, this.logger);
+  }
 }
 
 async function cleanupMissingSenders(
   provider: MessageProvider,
-  senders: SenderAccountEntity[]
+  senders: SenderEntity[],
+  logger: Logger
 ): Promise<void> {
   const providerIds = new Set(provider.listSenderIds?.() ?? []);
   const dbIds = new Set(senders.map((sender) => sender.id));
 
   for (const senderId of providerIds) {
     if (!dbIds.has(senderId)) {
-      console.warn(`Session for sender ${senderId} missing in DB. Cleaning up.`);
+      logger.warn(`session for sender ${senderId} missing in DB. cleaning up`);
       await provider.clear?.(senderId);
-      await cleanupAuthState(senderId);
+      await cleanupAuthState(senderId, logger);
     }
   }
 }
 
 async function syncSessions(
   provider: MessageProvider,
-  senderRepository: SenderAccountRepository,
-  senders: SenderAccountEntity[]
+  senderRepository: SenderRepository,
+  senders: SenderEntity[],
+  logger: Logger
 ): Promise<void> {
   for (const sender of senders) {
     if (
@@ -49,8 +53,22 @@ async function syncSessions(
       sender.status === SenderAccountStatus.DISCONNECTED
     ) {
       const state = await provider.getState?.(sender.id);
+      if (!state) {
+        if (
+          sender.status === SenderAccountStatus.CONNECTED ||
+          sender.status === SenderAccountStatus.SENDING
+        ) {
+          logger.warn(`sender ${sender.id} -> DISCONNECTED (state unavailable)`);
+          await senderRepository.updateStatus(
+            sender.id,
+            SenderAccountStatus.DISCONNECTED
+          );
+        }
+        continue;
+      }
       if (state === "CONNECTED") {
         if (sender.status !== SenderAccountStatus.CONNECTED) {
+          logger.info(`sender ${sender.id} -> CONNECTED`);
           await senderRepository.updateStatus(
             sender.id,
             SenderAccountStatus.CONNECTED
@@ -59,15 +77,17 @@ async function syncSessions(
         continue;
       }
       if (state && (state.startsWith("UNPAIRED") || state === "CONFLICT")) {
+        logger.warn(`sender ${sender.id} -> WAITING_QR (${state})`);
         await senderRepository.updateStatus(
           sender.id,
           SenderAccountStatus.WAITING_QR
         );
         await provider.clear?.(sender.id);
-        await cleanupAuthState(sender.id);
+        await cleanupAuthState(sender.id, logger);
         continue;
       }
       if (state && state !== "CONNECTED") {
+        logger.warn(`sender ${sender.id} -> DISCONNECTED (${state})`);
         await senderRepository.updateStatus(
           sender.id,
           SenderAccountStatus.DISCONNECTED
@@ -76,6 +96,7 @@ async function syncSessions(
     }
 
     if (sender.status === SenderAccountStatus.DISCONNECTED) {
+      logger.info(`sender ${sender.id} reinitializing`);
       await senderRepository.updateStatus(
         sender.id,
         SenderAccountStatus.INITIALIZING
@@ -83,7 +104,7 @@ async function syncSessions(
       try {
         await provider.initialize(sender.id);
       } catch (error) {
-        console.error(`Failed to reinitialize sender ${sender.id}`, error);
+        logger.error(`failed to reinitialize sender ${sender.id}`, error);
         await senderRepository.updateStatus(sender.id, SenderAccountStatus.ERROR);
       }
       continue;
@@ -91,11 +112,14 @@ async function syncSessions(
   }
 }
 
-async function cleanupAuthState(senderId: number): Promise<void> {
+async function cleanupAuthState(senderId: number, logger: Logger): Promise<void> {
   const sessionPath = join(AUTH_DATA_PATH, `session-sender-${senderId}`);
   try {
     await rm(sessionPath, { recursive: true, force: true });
   } catch (error) {
-    console.warn(`Failed to clean auth state for sender ${senderId}`, error);
+    logger.warn(`failed to clean auth state for sender ${senderId}`);
+    if (error) {
+      logger.error("cleanup error", error);
+    }
   }
 }

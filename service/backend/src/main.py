@@ -9,7 +9,6 @@ from src.api.routes.sender_accounts import router as sender_accounts_router
 from src.api.routes.workers import router as workers_router
 from src.application.errors import ConflictError, NotFoundError, ValidationError
 from src.config import get_settings
-from src.domain import models
 from src.infrastructure.db.base import Base
 from src.infrastructure.db.session import engine
 

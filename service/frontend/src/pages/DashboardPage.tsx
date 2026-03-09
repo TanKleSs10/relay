@@ -7,14 +7,13 @@ import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Spinner } from "../components/ui/Spinner";
 import {
-  useActiveWorkersCount,
-  useAvailableWorkersCount,
   useCampaigns,
   useDeleteCampaign,
   useDispatchCampaign,
   useEnumIndex,
-  useResetWorker,
+  usePauseCampaign,
   useRetryCampaign,
+  useSenderAccounts,
 } from "../features";
 
 const campaignStatusMeta: Record<string, { label: string; className: string }> = {
@@ -37,15 +36,22 @@ export function DashboardPage() {
   const queryClient = useQueryClient();
   const { data: enumIndex } = useEnumIndex();
   const { data: campaigns = [], isLoading } = useCampaigns();
-  const { data: availableWorkers } = useAvailableWorkersCount();
-  const { data: activeWorkers } = useActiveWorkersCount();
-  const resetWorker = useResetWorker();
+  const { data: senders = [] } = useSenderAccounts();
   const deleteCampaign = useDeleteCampaign();
   const dispatchCampaign = useDispatchCampaign();
+  const pauseCampaign = usePauseCampaign();
   const retryCampaign = useRetryCampaign();
 
   const statusTranslator = useMemo(() => buildCampaignStatusTranslator(enumIndex), [enumIndex]);
   const hasCampaigns = campaigns.length > 0;
+  const connectedSenders = useMemo(
+    () => senders.filter((sender) => sender.status === "CONNECTED").length,
+    [senders]
+  );
+  const sendingSenders = useMemo(
+    () => senders.filter((sender) => sender.status === "SENDING").length,
+    [senders]
+  );
 
   return (
     <>
@@ -58,34 +64,18 @@ export function DashboardPage() {
           <Link to="/create-campaign" className="btn btn--tertiary">
             📧 Crear Campaña
           </Link>
-          <Button
-            variant="danger"
-            onClick={() => {
-              resetWorker.mutate(1, {
-                onSuccess: () => {
-                  queryClient.invalidateQueries({ queryKey: ["workers"] });
-                  toast.success("Worker reseteado");
-                },
-                onError: () => {
-                  toast.error("No se pudo resetear el worker");
-                },
-              });
-            }}
-          >
-            Reset worker
-          </Button>
         </div>
-        <div className="workers-summary" style={{ marginTop: "20px" }}>
-          <span className="workers-summary__label" title="Workers listos para recibir una campaña">
-            Workers disponibles
+        <div className="senders-summary" style={{ marginTop: "20px" }}>
+          <span className="senders-summary__label" title="Senders listos para enviar mensajes">
+            Senders disponibles
           </span>
-          <span className="workers-summary__value">{availableWorkers?.available_workers ?? "-"}</span>
+          <span className="senders-summary__value">{connectedSenders}</span>
         </div>
-        <div className="workers-summary" style={{ marginTop: "12px" }}>
-          <span className="workers-summary__label" title="Workers procesando campañas">
-            Workers activos
+        <div className="senders-summary" style={{ marginTop: "12px" }}>
+          <span className="senders-summary__label" title="Senders enviando mensajes">
+            Senders activos
           </span>
-          <span className="workers-summary__value">{activeWorkers?.active_workers ?? "-"}</span>
+          <span className="senders-summary__value">{sendingSenders}</span>
         </div>
       </section>
 
@@ -103,6 +93,7 @@ export function DashboardPage() {
                 className: "",
               };
               const isPaused = campaign.status === "PAUSED";
+              const isActive = campaign.status === "ACTIVE";
 
               return (
                 <article key={campaign.id} className="campaign-card">
@@ -141,6 +132,27 @@ export function DashboardPage() {
                     >
                       Enviar Mensajes
                     </Button>
+                    {isActive ? (
+                      <Button
+                        variant="tertiary"
+                        className="campaign-card__button u-w-100 u-mb-2"
+                        onClick={() =>
+                          pauseCampaign.mutate(campaign.id, {
+                            onSuccess: () => {
+                              queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+                              toast.success("Campaña pausada");
+                            },
+                            onError: (error) => {
+                              toast.error(
+                                error instanceof Error ? error.message : "Error al pausar campaña"
+                              );
+                            },
+                          })
+                        }
+                      >
+                        Pausar
+                      </Button>
+                    ) : null}
                     {isPaused ? (
                       <Button
                         variant="secondary"

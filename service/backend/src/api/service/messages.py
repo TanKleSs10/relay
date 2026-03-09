@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 
 from sqlalchemy.orm import Session
@@ -12,13 +13,30 @@ def create_messages(
     db: Session,
     recipient: str,
     content: str,
-    campaign_id: int
-) -> Message:
+    campaign_id: int,
+    allow_duplicate: bool = False,
+) -> Message | None:
+    normalized_recipient = normalize_mx_recipient(recipient)
+    idempotency_key = build_idempotency_key(normalized_recipient, content)
+    existing = (
+        db.query(Message)
+        .filter(
+            Message.campaign_id == campaign_id,
+            Message.idempotency_key == idempotency_key,
+        )
+        .first()
+    )
+    if existing:
+        if allow_duplicate:
+            return None
+        raise ConflictError("Duplicate message for this campaign")
+
     message = Message(
-        recipient=normalize_mx_recipient(recipient),
+        recipient=normalized_recipient,
         content=content,
         campaign_id=campaign_id,
-        status=MessageStatus.PENDING
+        idempotency_key=idempotency_key,
+        status=MessageStatus.PENDING,
     )
     db.add(message)
     return message
@@ -28,40 +46,37 @@ def get_message_by_id(db: Session, message_id: int) -> Message | None:
     return db.query(Message).filter(Message.id == message_id).first()
 
 
-def list_messages(db: Session, skip: int = 0, limit: int = 100) -> list[Message]:
-    return (
-        db.query(Message)
-        .order_by(Message.id.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
-
-
-def list_messages_by_campaign(
-    db: Session, campaign_id: int, skip: int = 0, limit: int = 100
+def list_messages_filtered(
+    db: Session,
+    campaign_id: int | None = None,
+    status: MessageStatus | None = None,
+    skip: int = 0,
+    limit: int = 100,
 ) -> list[Message]:
+    query = db.query(Message)
+    if campaign_id is not None:
+        query = query.filter(Message.campaign_id == campaign_id)
+    if status is not None:
+        query = query.filter(Message.status == status)
     return (
-        db.query(Message)
-        .filter(Message.campaign_id == campaign_id)
-        .order_by(Message.id.desc())
+        query.order_by(Message.id.desc())
         .offset(skip)
         .limit(limit)
         .all()
     )
 
 
-def list_messages_by_status(
-    db: Session, status: MessageStatus, skip: int = 0, limit: int = 100
-) -> list[Message]:
-    return (
-        db.query(Message)
-        .filter(Message.status == status)
-        .order_by(Message.id.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+def count_messages_filtered(
+    db: Session,
+    campaign_id: int | None = None,
+    status: MessageStatus | None = None,
+) -> int:
+    query = db.query(Message)
+    if campaign_id is not None:
+        query = query.filter(Message.campaign_id == campaign_id)
+    if status is not None:
+        query = query.filter(Message.status == status)
+    return query.count()
 
 
 def update_message_status(
@@ -83,11 +98,28 @@ def update_message_error(
     return message
 
 
-def update_message(db: Session, message: Message, recipient: str | None, payload: str | None) -> Message:
-    if recipient is not None:
-        message.recipient = normalize_mx_recipient(recipient)
-    if payload is not None:
-        message.content = payload
+def update_message(
+    db: Session, message: Message, recipient: str | None, payload: str | None
+) -> Message:
+    next_recipient = normalize_mx_recipient(recipient) if recipient is not None else message.recipient
+    next_content = payload if payload is not None else message.content
+
+    if next_recipient != message.recipient or next_content != message.content:
+        next_key = build_idempotency_key(next_recipient, next_content)
+        existing = (
+            db.query(Message)
+            .filter(
+                Message.campaign_id == message.campaign_id,
+                Message.idempotency_key == next_key,
+                Message.id != message.id,
+            )
+            .first()
+        )
+        if existing:
+            raise ConflictError("Duplicate message for this campaign")
+        message.idempotency_key = next_key
+        message.recipient = next_recipient
+        message.content = next_content
     return message
 
 
@@ -128,3 +160,8 @@ def normalize_mx_recipient(recipient: str) -> str:
     if len(digits) == 13 and digits.startswith("521"):
         return digits
     return digits or recipient
+
+
+def build_idempotency_key(recipient: str, content: str) -> str:
+    base = f"{recipient}:{content.strip()}"
+    return hashlib.sha256(base.encode("utf-8")).hexdigest()

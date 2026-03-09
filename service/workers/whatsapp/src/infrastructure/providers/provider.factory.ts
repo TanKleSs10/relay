@@ -1,7 +1,7 @@
-import type { MessageProvider } from "../../domain/message-provider.interface";
+import type { MessageProvider } from "../../domain/interfaces/message-provider.interface";
 
-import { WhatsAppWebProvider } from "./whatsapp-web.provider";
+import { WhatsAppProvider } from "./whatsapp.provider";
 
 export function createMessageProvider(): MessageProvider {
-  return new WhatsAppWebProvider();
+  return new WhatsAppProvider();
 }

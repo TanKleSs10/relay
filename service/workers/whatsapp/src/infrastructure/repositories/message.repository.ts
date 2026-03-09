@@ -8,6 +8,7 @@ export type MessageRow = {
   recipient: string;
   content: string;
   status: string;
+  idempotency_key?: string | null;
 };
 
 export class MessageRepository {
@@ -17,53 +18,29 @@ export class MessageRepository {
     this.pool = pool;
   }
 
-  async reserveQueuedByCampaign(
+  async claimNextBatch(
     campaignId: number,
+    workerId: number,
     limit: number
   ): Promise<MessageRow[]> {
-    const queued = await this.pool.query<{ id: number; recipient: string; norm: string }>(
+    const result = await this.pool.query<MessageRow>(
       `WITH candidates AS (
-         SELECT id,
-                recipient,
-                regexp_replace(recipient, '\\D', '', 'g') AS norm
+         SELECT id
          FROM messages
          WHERE campaign_id = $1
            AND status = $2
-       ),
-       sent AS (
-         SELECT DISTINCT regexp_replace(recipient, '\\D', '', 'g') AS norm
-         FROM messages
-         WHERE campaign_id = $1
-           AND status = $4
+         ORDER BY id ASC
+         FOR UPDATE SKIP LOCKED
+         LIMIT $3
        )
-       SELECT DISTINCT ON (candidates.norm) candidates.id, candidates.recipient, candidates.norm
-       FROM candidates
-       WHERE candidates.norm NOT IN (SELECT norm FROM sent)
-       ORDER BY candidates.norm, candidates.id ASC
-       LIMIT $3`,
-      [campaignId, MessageStatus.PENDING, limit, MessageStatus.SENT]
+       UPDATE messages
+       SET status = $4,
+           locked_at = NOW(),
+           processing_by_worker = $5
+       WHERE id IN (SELECT id FROM candidates)
+       RETURNING id, campaign_id, recipient, content, status, idempotency_key`,
+      [campaignId, MessageStatus.PENDING, limit, MessageStatus.PROCESSING, workerId]
     );
-    const ids = queued.rows.map((row) => row.id);
-    const recipients = queued.rows.map((row) => row.recipient);
-    const normalizedRecipients = queued.rows.map((row) => row.norm);
-    if (!ids.length) {
-      return [];
-    }
-    const result = await this.pool.query<MessageRow>(
-      "UPDATE messages SET status = $2, locked_at = NOW() WHERE id = ANY($1) AND status = $3 RETURNING id, campaign_id, recipient, content, status",
-      [ids, MessageStatus.PROCESSING, MessageStatus.PENDING]
-    );
-    if (normalizedRecipients.length) {
-      await this.pool.query(
-        "UPDATE messages SET status = $2, retry_count = retry_count + 1 WHERE campaign_id = $1 AND status = $4 AND regexp_replace(recipient, '\\D', '', 'g') = ANY($5)",
-        [
-          campaignId,
-          MessageStatus.FAILED,
-          MessageStatus.PENDING,
-          normalizedRecipients,
-        ]
-      );
-    }
     return result.rows;
   }
 
@@ -76,6 +53,14 @@ export class MessageRepository {
       [campaignId, MessageStatus.PENDING, limit]
     );
     return result.rows;
+  }
+
+  async releaseStaleLocks(maxAgeMinutes: number): Promise<number> {
+    const result = await this.pool.query<{ count: string }>(
+      "UPDATE messages SET status = $2, locked_at = NULL, processing_by_worker = NULL, processing_sender_id = NULL WHERE status = $1 AND locked_at IS NOT NULL AND locked_at < NOW() - ($3 || ' minutes')::interval RETURNING id",
+      [MessageStatus.PROCESSING, MessageStatus.PENDING, maxAgeMinutes]
+    );
+    return result.rowCount ?? 0;
   }
 
   async countQueuedByCampaign(campaignId: number): Promise<number> {
@@ -94,7 +79,18 @@ export class MessageRepository {
     return Number(result.rows[0]?.count ?? 0);
   }
 
-  async hasSentRecipient(campaignId: number, recipient: string): Promise<boolean> {
+  async hasSentIdempotency(
+    campaignId: number,
+    idempotencyKey: string | null,
+    recipient: string
+  ): Promise<boolean> {
+    if (idempotencyKey) {
+      const result = await this.pool.query<{ exists: boolean }>(
+        "SELECT EXISTS (SELECT 1 FROM messages WHERE campaign_id = $1 AND status = $2 AND idempotency_key = $3) AS exists",
+        [campaignId, MessageStatus.SENT, idempotencyKey]
+      );
+      return result.rows[0]?.exists ?? false;
+    }
     const result = await this.pool.query<{ exists: boolean }>(
       "SELECT EXISTS (SELECT 1 FROM messages WHERE campaign_id = $1 AND status = $2 AND regexp_replace(recipient, '\\D', '', 'g') = $3) AS exists",
       [campaignId, MessageStatus.SENT, recipient]
@@ -102,17 +98,28 @@ export class MessageRepository {
     return result.rows[0]?.exists ?? false;
   }
 
-  async markSent(messageId: number): Promise<void> {
+  async markSent(messageId: number, senderId: number): Promise<void> {
     await this.pool.query(
-      "UPDATE messages SET status = $2, sent_at = NOW() WHERE id = $1",
-      [messageId, MessageStatus.SENT]
+      "UPDATE messages SET status = $2, sent_at = NOW(), processing_sender_id = $3 WHERE id = $1",
+      [messageId, MessageStatus.SENT, senderId]
     );
   }
 
-  async markFailed(messageId: number, error: string): Promise<void> {
+  async markFailed(
+    messageId: number,
+    error: string,
+    senderId: number | null
+  ): Promise<void> {
     await this.pool.query(
-      "UPDATE messages SET status = $2, retry_count = retry_count + 1 WHERE id = $1",
-      [messageId, MessageStatus.FAILED]
+      "UPDATE messages SET status = $2, retry_count = retry_count + 1, processing_sender_id = $3 WHERE id = $1",
+      [messageId, MessageStatus.FAILED, senderId]
+    );
+  }
+
+  async markPending(messageId: number): Promise<void> {
+    await this.pool.query(
+      "UPDATE messages SET status = $2, locked_at = NULL, processing_by_worker = NULL, processing_sender_id = NULL WHERE id = $1",
+      [messageId, MessageStatus.PENDING]
     );
   }
 }

@@ -4,6 +4,7 @@ from src.application.usecases.campaign_usecases import (
     dispatch_campaign,
     get_campaign,
     get_campaigns,
+    pause_campaign,
     remove_campaign,
     retry_campaign,
     update_campaign,
@@ -74,6 +75,10 @@ def delete_item(campaign_id: int, db: Session = Depends(get_db)):
 @router.post("/{campaign_id}/dispatch", status_code=status.HTTP_202_ACCEPTED)
 def dispatch_item(campaign_id: int, db: Session = Depends(get_db)):
     return dispatch_campaign(campaign_id, db)
+
+@router.post("/{campaign_id}/pause", status_code=status.HTTP_202_ACCEPTED)
+def pause_item(campaign_id: int, db: Session = Depends(get_db)):
+    return pause_campaign(campaign_id, db)
 
 
 @router.post("/{campaign_id}/retry", status_code=status.HTTP_202_ACCEPTED)

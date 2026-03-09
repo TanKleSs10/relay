@@ -11,6 +11,7 @@ from src.application.usecases.sender_account_usecases import (
     get_sender as get_sender_usecase,
     list_senders as list_senders_usecase,
     remove_sender as remove_sender_usecase,
+    reset_sender as reset_sender_usecase,
 )
 
 router = APIRouter(prefix="/sender-accounts", tags=["sender-accounts"])
@@ -46,3 +47,8 @@ def get_item(sender_id: int, db: Session = Depends(get_db)):
 def delete_item(sender_id: int, db: Session = Depends(get_db)):
     remove_sender_usecase(sender_id, db)
     return None
+
+
+@router.post("/{sender_id}/reset-session", response_model=SenderAccountRead)
+def reset_session(sender_id: int, db: Session = Depends(get_db)):
+    return reset_sender_usecase(sender_id, db)

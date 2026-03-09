@@ -17,6 +17,10 @@ export function dispatchCampaign(campaignId: number) {
   return request(`/campaigns/${campaignId}/dispatch`, { method: "POST" });
 }
 
+export function pauseCampaign(campaignId: number) {
+  return request(`/campaigns/${campaignId}/pause`, { method: "POST" });
+}
+
 export function retryCampaign(campaignId: number) {
   return request(`/campaigns/${campaignId}/retry`, { method: "POST" });
 }
