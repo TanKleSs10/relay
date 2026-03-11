@@ -42,14 +42,24 @@ cd service/backend
 alembic downgrade -1
 ```
 
+## Baseline actual (schema limpio)
+El baseline actual se encuentra en `service/backend/alembic/versions/0002_baseline_reset.py`.
+Las migraciones anteriores fueron movidas a `service/backend/alembic/legacy/` y ya no
+forman parte de la cadena de Alembic.
+
 ## Primer setup si la BD ya existe
 Si la BD ya tiene el esquema (tablas creadas manualmente o por otro proceso):
 ```bash
 cd service/backend
-alembic revision --autogenerate -m "baseline"
 alembic stamp head
 ```
 - `stamp head` marca las migraciones como aplicadas sin ejecutar DDL.
+
+## Reset completo (DB vacía o entorno nuevo)
+```bash
+cd service/backend
+alembic upgrade head
+```
 
 ## Notas sobre enums en Postgres
 - Alembic no siempre maneja cambios de enums automaticamente.
