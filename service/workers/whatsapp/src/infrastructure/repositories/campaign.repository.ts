@@ -19,7 +19,7 @@ export class CampaignRepository {
 
   async markDone(campaignId: number): Promise<void> {
     await this.pool.query(
-      "UPDATE campaigns SET status = $2 WHERE id = $1",
+      "UPDATE campaigns SET status = $2, finished_at = NOW() WHERE id = $1",
       [campaignId, CampaignStatus.FINISHED]
     );
   }

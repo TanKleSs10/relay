@@ -1,5 +1,5 @@
 import { request } from "../../../api";
-import type { Campaign, CampaignUploadSummary } from "../campaign.types";
+import type { Campaign, CampaignMetrics, CampaignUploadSummary } from "../campaign.types";
 
 export function listCampaigns() {
   return request<Campaign[]>("/campaigns");
@@ -7,6 +7,10 @@ export function listCampaigns() {
 
 export function getCampaign(campaignId: number) {
   return request<Campaign>(`/campaigns/${campaignId}`);
+}
+
+export function getCampaignMetrics(campaignId: number) {
+  return request<CampaignMetrics>(`/campaigns/${campaignId}/metrics`);
 }
 
 export function deleteCampaign(campaignId: number) {

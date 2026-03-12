@@ -14,6 +14,7 @@ export enum MessageStatus {
   PROCESSING = "PROCESSING",
   SENT = "SENT",
   FAILED = "FAILED",
+  NO_WA = "NO_WA",
 }
 
 export enum SenderAccountStatus {

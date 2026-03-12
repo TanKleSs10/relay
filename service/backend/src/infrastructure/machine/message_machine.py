@@ -8,13 +8,16 @@ _ALLOWED_TRANSITIONS: Final[dict[MessageStatus, set[MessageStatus]]] = {
     MessageStatus.PENDING: {
         MessageStatus.PROCESSING,
         MessageStatus.FAILED,
+        MessageStatus.NO_WA,
     },
     MessageStatus.PROCESSING: {
         MessageStatus.SENT,
         MessageStatus.FAILED,
+        MessageStatus.NO_WA,
     },
     MessageStatus.SENT: set(),
     MessageStatus.FAILED: set(),
+    MessageStatus.NO_WA: set(),
 }
 
 

@@ -14,3 +14,16 @@ export const CampaignSchema = z.object({
 });
 
 export type Campaign = z.infer<typeof CampaignSchema>;
+
+export const CampaignMetricsSchema = z.object({
+  campaign_id: z.number().int(),
+  total: z.number().int().nonnegative(),
+  sent: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+  pending: z.number().int().nonnegative(),
+  processing: z.number().int().nonnegative(),
+  no_wa: z.number().int().nonnegative(),
+  effectiveness: z.number().min(0).max(1),
+});
+
+export type CampaignMetrics = z.infer<typeof CampaignMetricsSchema>;

@@ -4,6 +4,7 @@ from src.application.usecases.campaign_usecases import (
     dispatch_campaign,
     get_campaign,
     get_campaigns,
+    get_campaign_metrics,
     pause_campaign,
     remove_campaign,
     retry_campaign,
@@ -15,6 +16,7 @@ from src.api.schemas.campaigns import (
     CampaignUpdate,
     CampaignCreate,
     CampaignUploadSummary,
+    CampaignMetrics,
 )
 from sqlalchemy.orm import Session
 from src.api.routes.deps import get_db
@@ -57,6 +59,11 @@ def list_items(db: Session = Depends(get_db)):
 @router.get("/{campaign_id}", response_model=CampaignRead)
 def get_item(campaign_id: int, db: Session = Depends(get_db)):
     return get_campaign(campaign_id, db)
+
+
+@router.get("/{campaign_id}/metrics", response_model=CampaignMetrics)
+def get_metrics(campaign_id: int, db: Session = Depends(get_db)):
+    return get_campaign_metrics(campaign_id, db)
 
 
 @router.patch("/{campaign_id}", response_model=CampaignRead)
