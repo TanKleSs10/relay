@@ -116,6 +116,16 @@ export class MessageRepository {
     );
   }
 
+  async markNoWa(
+    messageId: number,
+    senderId: number | null
+  ): Promise<void> {
+    await this.pool.query(
+      "UPDATE messages SET status = $2, processing_sender_id = $3 WHERE id = $1",
+      [messageId, MessageStatus.NO_WA, senderId]
+    );
+  }
+
   async markPending(messageId: number): Promise<void> {
     await this.pool.query(
       "UPDATE messages SET status = $2, locked_at = NULL, processing_by_worker = NULL, processing_sender_id = NULL WHERE id = $1",

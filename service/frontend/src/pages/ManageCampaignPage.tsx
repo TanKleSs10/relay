@@ -6,6 +6,7 @@ import { toast } from "react-toastify";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Spinner } from "../components/ui/Spinner";
+import { CampaignMetricsPanel } from "../components/campaign/CampaignMetricsPanel";
 import type { Message } from "../schemas";
 import {
   useCampaign,
@@ -45,7 +46,14 @@ export function ManageCampaignPage() {
     return `${totalMessages}`;
   }, [isLoadingMessages, totalMessages]);
 
-  const statusOptions = ["all", "PENDING", "PROCESSING", "SENT", "FAILED"];
+  const statusOptions = ["all", "PENDING", "PROCESSING", "SENT", "FAILED", "NO_WA"];
+  const formatCampaignError = (error: unknown) => {
+    const message = error instanceof Error ? error.message : "";
+    if (message.includes("No CONNECTED senders available")) {
+      return "No hay senders disponibles";
+    }
+    return message || "No se pudo reintentar";
+  };
 
   if (!campaignId || Number.isNaN(campaignIdNumber)) {
     return (
@@ -92,6 +100,7 @@ export function ManageCampaignPage() {
             <strong>Mensajes (página):</strong> {messageCountLabel}
           </p>
         </div>
+        <CampaignMetricsPanel campaignId={campaign.id} />
         <div className="actions__group" style={{ marginBottom: "2rem" }}>
           {campaign.status === "PAUSED" ? (
             <Button
@@ -106,9 +115,7 @@ export function ManageCampaignPage() {
                     toast.success("Mensajes fallidos reintentados");
                   },
                   onError: (error) => {
-                    toast.error(
-                      error instanceof Error ? error.message : "No se pudo reintentar"
-                    );
+                    toast.error(formatCampaignError(error));
                   },
                 })
               }

@@ -36,6 +36,15 @@ export class CampaignManager {
     private sendLogRepository: SendLogRepository
   ) {}
 
+  async finishActiveCampaign(): Promise<void> {
+    const campaignId = await this.campaignRepository.getActiveCampaignId();
+    if (!campaignId) {
+      return;
+    }
+    this.logger.warn(`marking campaign ${campaignId} FINISHED due to worker failure`);
+    await this.campaignRepository.markDone(campaignId);
+  }
+
   async dispatchOnce(): Promise<void> {
     try {
       const campaignId = await this.campaignRepository.getActiveCampaignId();
@@ -248,6 +257,24 @@ export class CampaignManager {
         this.logger.error(`message ${message.id} failed: ${note}`);
       };
       const normalizedError = errorMessage.toLowerCase();
+      if (isNoWaRecipient(normalizedError)) {
+        await this.messageRepository.markNoWa(message.id, senderId);
+        await this.sendLogRepository.create({
+          messageId: message.id,
+          senderId,
+          workerId: this.workerId,
+          status: "NO_WA",
+          errorMessage,
+        });
+        this.logger.warn(
+          `message ${message.id} marked NO_WA for recipient ${message.recipient}`
+        );
+        await this.senderRepository.updateStatus(
+          senderId,
+          SenderAccountStatus.CONNECTED
+        );
+        return { sent: false, avoidCooldown: true };
+      }
       if (
         normalizedError.includes("execution context was destroyed") ||
         normalizedError.includes("target closed")
@@ -345,4 +372,17 @@ function normalizeRecipientForDedup(recipient: string): string {
     return `521${digits.slice(2)}`;
   }
   return digits || recipient;
+}
+
+function isNoWaRecipient(error: string): boolean {
+  return (
+    error.includes("no lid for user") ||
+    error.includes("not a whatsapp user") ||
+    error.includes("not registered") ||
+    error.includes("recipient is not registered") ||
+    error.includes("invalid number") ||
+    error.includes("invalid jid") ||
+    error.includes("wid error") ||
+    error.includes("jid error")
+  );
 }

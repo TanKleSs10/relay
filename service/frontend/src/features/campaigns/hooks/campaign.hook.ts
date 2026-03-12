@@ -4,6 +4,7 @@ import {
   deleteCampaign,
   dispatchCampaign,
   getCampaign,
+  getCampaignMetrics,
   listCampaigns,
   pauseCampaign,
   retryCampaign,
@@ -28,6 +29,14 @@ export const useCampaign = (campaignId: number) =>
     queryKey: campaignKeys.detail(campaignId),
     queryFn: () => getCampaign(campaignId),
     enabled: Number.isFinite(campaignId),
+  });
+
+export const useCampaignMetrics = (campaignId: number) =>
+  useQuery({
+    queryKey: [...campaignKeys.detail(campaignId), "metrics"],
+    queryFn: () => getCampaignMetrics(campaignId),
+    enabled: Number.isFinite(campaignId),
+    refetchInterval: 5000,
   });
 
 export const useDeleteCampaign = () =>

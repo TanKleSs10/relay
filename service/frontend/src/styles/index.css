@@ -618,6 +618,44 @@ a {
     text-align: center;
 }
 
+.metrics-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    background: var(--color-card-bg);
+    border: 1px solid var(--color-card-header-bg);
+    border-radius: 12px;
+}
+
+.metrics-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.75rem;
+    border-radius: 10px;
+    background: var(--color-card-header-bg);
+}
+
+.metrics-item--highlight {
+    background: var(--color-status-processing-bg);
+}
+
+.metrics-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-card-meta-label);
+    font-weight: 600;
+}
+
+.metrics-value {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--color-card-name);
+}
+
 .filter-row {
     align-items: center;
     flex-wrap: wrap;

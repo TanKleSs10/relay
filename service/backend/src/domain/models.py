@@ -30,6 +30,7 @@ class MessageStatus(str, Enum):
     PROCESSING = "PROCESSING"
     SENT = "SENT"
     FAILED = "FAILED"
+    NO_WA = "NO_WA"
 
 
 class SenderAccountStatus(str, Enum):

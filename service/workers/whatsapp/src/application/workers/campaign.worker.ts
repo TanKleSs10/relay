@@ -16,6 +16,7 @@ export class CampaignWorker {
         await this.manager.dispatchOnce();
       } catch (error) {
         this.logger.error("tick failed", error);
+        await this.manager.finishActiveCampaign();
       }
       await delay(this.intervalMs);
     }

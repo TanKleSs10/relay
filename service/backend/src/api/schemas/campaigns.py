@@ -24,6 +24,17 @@ class CampaignUpdate(APIModel):
 
 from src.api.schemas.messages import MessageRead
 
+
+class CampaignMetrics(APIModel):
+    campaign_id: PositiveInt
+    total: int = Field(ge=0)
+    sent: int = Field(ge=0)
+    failed: int = Field(ge=0)
+    pending: int = Field(ge=0)
+    processing: int = Field(ge=0)
+    no_wa: int = Field(ge=0)
+    effectiveness: float = Field(ge=0, le=1)
+
 class CampaignRead(CampaignBase):
     id: PositiveInt
     status: CampaignStatus

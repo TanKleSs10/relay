@@ -52,6 +52,13 @@ export function DashboardPage() {
     () => senders.filter((sender) => sender.status === "SENDING").length,
     [senders]
   );
+  const formatCampaignError = (error: unknown) => {
+    const message = error instanceof Error ? error.message : "";
+    if (message.includes("No CONNECTED senders available")) {
+      return "No hay senders disponibles";
+    }
+    return message || "Error al despachar campaña";
+  };
 
   return (
     <>
@@ -125,7 +132,7 @@ export function DashboardPage() {
                             toast.success("Campaña despachada");
                           },
                           onError: (error) => {
-                            toast.error(error instanceof Error ? error.message : "Error al despachar campaña");
+                            toast.error(formatCampaignError(error));
                           },
                         })
                       }

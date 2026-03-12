@@ -1,4 +1,5 @@
 from datetime import datetime
+from sqlalchemy import func
 
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
@@ -14,8 +15,8 @@ from src.api.service.campaigns import (
     update_campaign as update_campaign_service,
 )
 from src.api.service.messages import create_messages, reset_messages_by_campaign
-from src.domain.models import Campaign
-from src.domain import CampaignStatus
+from src.domain.models import Campaign, SenderAccount, Message
+from src.domain import CampaignStatus, SenderAccountStatus, MessageStatus
 from src.infrastructure.file_readers.factory import get_reader
 from src.infrastructure.machine.campaign_machine import can_transition
 
@@ -163,6 +164,13 @@ def dispatch_campaign(campaign_id: int, db: Session) -> dict[str, int]:
     )
     if active:
         raise ConflictError("Another campaign is already ACTIVE")
+    available_sender = (
+        db.query(SenderAccount)
+        .filter(SenderAccount.status == SenderAccountStatus.CONNECTED)
+        .first()
+    )
+    if not available_sender:
+        raise ConflictError("No CONNECTED senders available")
 
     try:
         campaign.status = CampaignStatus.ACTIVE
@@ -206,6 +214,13 @@ def retry_campaign(campaign_id: int, db: Session) -> dict[str, int]:
     )
     if active:
         raise ConflictError("Another campaign is already ACTIVE")
+    available_sender = (
+        db.query(SenderAccount)
+        .filter(SenderAccount.status == SenderAccountStatus.CONNECTED)
+        .first()
+    )
+    if not available_sender:
+        raise ConflictError("No CONNECTED senders available")
 
     try:
         reset_count = reset_messages_by_campaign(db, campaign_id)
@@ -215,3 +230,32 @@ def retry_campaign(campaign_id: int, db: Session) -> dict[str, int]:
     except Exception as exc:
         db.rollback()
         raise exc
+
+
+def get_campaign_metrics(campaign_id: int, db: Session) -> dict[str, int | float]:
+    campaign = get_campaign_by_id(db, campaign_id)
+    if not campaign:
+        raise NotFoundError("Campaign not found")
+    counts = dict(
+        db.query(Message.status, func.count(Message.id))
+        .filter(Message.campaign_id == campaign_id)
+        .group_by(Message.status)
+        .all()
+    )
+    total = sum(counts.values()) if counts else 0
+    sent = counts.get(MessageStatus.SENT, 0)
+    failed = counts.get(MessageStatus.FAILED, 0)
+    pending = counts.get(MessageStatus.PENDING, 0)
+    processing = counts.get(MessageStatus.PROCESSING, 0)
+    no_wa = counts.get(MessageStatus.NO_WA, 0)
+    effectiveness = (sent / total) if total else 0.0
+    return {
+        "campaign_id": campaign_id,
+        "total": total,
+        "sent": sent,
+        "failed": failed,
+        "pending": pending,
+        "processing": processing,
+        "no_wa": no_wa,
+        "effectiveness": effectiveness,
+    }
