@@ -4,6 +4,7 @@ import hashlib
 import re
 
 from sqlalchemy.orm import Session
+from uuid import UUID
 
 from src.application.errors import ConflictError
 from src.domain import Message, MessageStatus
@@ -13,7 +14,8 @@ def create_messages(
     db: Session,
     recipient: str,
     content: str,
-    campaign_id: int,
+    campaign_id: UUID,
+    workspace_id: UUID,
     allow_duplicate: bool = False,
 ) -> Message | None:
     normalized_recipient = normalize_mx_recipient(recipient)
@@ -35,6 +37,7 @@ def create_messages(
         recipient=normalized_recipient,
         content=content,
         campaign_id=campaign_id,
+        workspace_id=workspace_id,
         idempotency_key=idempotency_key,
         status=MessageStatus.PENDING,
     )
@@ -42,13 +45,13 @@ def create_messages(
     return message
 
 
-def get_message_by_id(db: Session, message_id: int) -> Message | None:
+def get_message_by_id(db: Session, message_id: UUID) -> Message | None:
     return db.query(Message).filter(Message.id == message_id).first()
 
 
 def list_messages_filtered(
     db: Session,
-    campaign_id: int | None = None,
+    campaign_id: UUID | None = None,
     status: MessageStatus | None = None,
     skip: int = 0,
     limit: int = 100,
@@ -68,7 +71,7 @@ def list_messages_filtered(
 
 def count_messages_filtered(
     db: Session,
-    campaign_id: int | None = None,
+    campaign_id: UUID | None = None,
     status: MessageStatus | None = None,
 ) -> int:
     query = db.query(Message)
@@ -127,12 +130,12 @@ def delete_message(db: Session, message: Message) -> None:
     db.delete(message)
 
 
-def delete_messages_by_campaign(db: Session, campaign_id: int) -> int:
+def delete_messages_by_campaign(db: Session, campaign_id: UUID) -> int:
     count = db.query(Message).filter(Message.campaign_id == campaign_id).delete()
     return count
 
 
-def reset_messages_by_campaign(db: Session, campaign_id: int) -> int:
+def reset_messages_by_campaign(db: Session, campaign_id: UUID) -> int:
     count = (
         db.query(Message)
         .filter(

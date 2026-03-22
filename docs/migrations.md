@@ -43,7 +43,7 @@ alembic downgrade -1
 ```
 
 ## Baseline actual (schema limpio)
-El baseline actual se encuentra en `service/backend/alembic/versions/0002_baseline_reset.py`.
+El baseline actual se encuentra en `service/backend/alembic/versions/0003_uuid_baseline.py`.
 Las migraciones anteriores fueron movidas a `service/backend/alembic/legacy/` y ya no
 forman parte de la cadena de Alembic.
 
