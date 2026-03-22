@@ -11,6 +11,7 @@ from src.application.usecases.campaign_usecases import (
     update_campaign,
 )
 from fastapi import APIRouter, Depends, File, Form, UploadFile, status
+from uuid import UUID
 from src.api.schemas.campaigns import (
     CampaignRead,
     CampaignUpdate,
@@ -57,37 +58,37 @@ def list_items(db: Session = Depends(get_db)):
 
 
 @router.get("/{campaign_id}", response_model=CampaignRead)
-def get_item(campaign_id: int, db: Session = Depends(get_db)):
+def get_item(campaign_id: UUID, db: Session = Depends(get_db)):
     return get_campaign(campaign_id, db)
 
 
 @router.get("/{campaign_id}/metrics", response_model=CampaignMetrics)
-def get_metrics(campaign_id: int, db: Session = Depends(get_db)):
+def get_metrics(campaign_id: UUID, db: Session = Depends(get_db)):
     return get_campaign_metrics(campaign_id, db)
 
 
 @router.patch("/{campaign_id}", response_model=CampaignRead)
 def update_item(
-    campaign_id: int, payload: CampaignUpdate, db: Session = Depends(get_db)
+    campaign_id: UUID, payload: CampaignUpdate, db: Session = Depends(get_db)
 ):
     return update_campaign(campaign_id, payload, db)
 
 
 @router.delete("/{campaign_id}", status_code=status.HTTP_200_OK)
-def delete_item(campaign_id: int, db: Session = Depends(get_db)):
+def delete_item(campaign_id: UUID, db: Session = Depends(get_db)):
     remove_campaign(campaign_id, db)
     return {"detail": "Campaign deleted successfully"}
 
 
 @router.post("/{campaign_id}/dispatch", status_code=status.HTTP_202_ACCEPTED)
-def dispatch_item(campaign_id: int, db: Session = Depends(get_db)):
+def dispatch_item(campaign_id: UUID, db: Session = Depends(get_db)):
     return dispatch_campaign(campaign_id, db)
 
 @router.post("/{campaign_id}/pause", status_code=status.HTTP_202_ACCEPTED)
-def pause_item(campaign_id: int, db: Session = Depends(get_db)):
+def pause_item(campaign_id: UUID, db: Session = Depends(get_db)):
     return pause_campaign(campaign_id, db)
 
 
 @router.post("/{campaign_id}/retry", status_code=status.HTTP_202_ACCEPTED)
-def retry_item(campaign_id: int, db: Session = Depends(get_db)):
+def retry_item(campaign_id: UUID, db: Session = Depends(get_db)):
     return retry_campaign(campaign_id, db)

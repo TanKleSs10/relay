@@ -9,6 +9,12 @@ from src.api.schemas.sender_accounts import (
     SenderAccountUpdate,
 )
 
+from src.api.schemas.users import (
+    UserCreate,
+    UserRead,
+    UserLogin,
+)
+
 __all__ = [
     "CampaignCreate",
     "CampaignRead",
@@ -16,4 +22,7 @@ __all__ = [
     "SenderAccountCreate",
     "SenderAccountRead",
     "SenderAccountUpdate",
+    "UserCreate",
+    "UserRead",
+    "UserLogin",
 ]

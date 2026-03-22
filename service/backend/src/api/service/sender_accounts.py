@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
+from uuid import UUID
 
 from src.api.schemas.sender_accounts import SenderAccountCreate, SenderAccountUpdate
 from src.domain import SenderAccount, SenderAccountStatus
+from uuid import UUID, uuid4
 
 
 def get_sender_accounts_by_status(
@@ -21,19 +23,24 @@ def list_sender_accounts(db: Session) -> list[SenderAccount]:
 
 
 def create_sender_account(
-    db: Session, payload: SenderAccountCreate | None = None
+    db: Session, workspace_id: UUID, payload: SenderAccountCreate | None = None
 ) -> SenderAccount:
+    label = None
+    if payload:
+        label = payload.label
+    if not label:
+        label = f"Sender {uuid4().hex[:8]}"
     sender = SenderAccount(
+        workspace_id=workspace_id,
+        label=label,
         status=SenderAccountStatus.CREATED,
         phone_number=None,
-        qr_code=None,
-        session_path=None,
     )
     db.add(sender)
     return sender
 
 
-def get_sender_account_by_id(db: Session, sender_id: int) -> SenderAccount | None:
+def get_sender_account_by_id(db: Session, sender_id: UUID) -> SenderAccount | None:
     return db.query(SenderAccount).filter(SenderAccount.id == sender_id).first()
 
 
@@ -53,7 +60,4 @@ def update_sender_account(
 def reset_sender_session(db: Session, sender: SenderAccount) -> SenderAccount:
     sender.status = SenderAccountStatus.WAITING_QR
     sender.phone_number = None
-    sender.qr_code = None
-    sender.qr_generated_at = None
-    sender.session_path = None
     return sender

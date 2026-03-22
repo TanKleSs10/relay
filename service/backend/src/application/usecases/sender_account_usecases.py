@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
+from uuid import UUID
 
 from src.api.schemas.sender_accounts import SenderAccountCreate, SenderAccountUpdate
 from src.application.errors import NotFoundError
@@ -12,12 +13,14 @@ from src.api.service.sender_accounts import (
     reset_sender_session,
     update_sender_account,
 )
+from src.api.service.workspaces import get_default_workspace_id
 from src.domain import SenderAccount
 
 
 def create_sender(db: Session, payload: SenderAccountCreate | None = None) -> SenderAccount:
     try:
-        sender = create_sender_account(db, payload)
+        workspace_id = get_default_workspace_id(db)
+        sender = create_sender_account(db, workspace_id, payload)
         db.commit()
         db.refresh(sender)
         return sender
@@ -30,14 +33,14 @@ def list_senders(db: Session) -> list[SenderAccount]:
     return list_sender_accounts(db)
 
 
-def get_sender(sender_id: int, db: Session) -> SenderAccount:
+def get_sender(sender_id: UUID, db: Session) -> SenderAccount:
     sender = get_sender_account_by_id(db, sender_id)
     if not sender:
         raise NotFoundError("Sender account not found")
     return sender
 
 
-def remove_sender(sender_id: int, db: Session) -> None:
+def remove_sender(sender_id: UUID, db: Session) -> None:
     sender = get_sender_account_by_id(db, sender_id)
     if not sender:
         raise NotFoundError("Sender account not found")
@@ -50,7 +53,7 @@ def remove_sender(sender_id: int, db: Session) -> None:
 
 
 def update_sender(
-    sender_id: int, payload: SenderAccountUpdate, db: Session
+    sender_id: UUID, payload: SenderAccountUpdate, db: Session
 ) -> SenderAccount:
     sender = get_sender_account_by_id(db, sender_id)
     if not sender:
@@ -65,7 +68,7 @@ def update_sender(
         raise exc
 
 
-def reset_sender(sender_id: int, db: Session) -> SenderAccount:
+def reset_sender(sender_id: UUID, db: Session) -> SenderAccount:
     sender = get_sender_account_by_id(db, sender_id)
     if not sender:
         raise NotFoundError("Sender account not found")

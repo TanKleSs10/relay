@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
+from uuid import UUID
 
 from src.api.schemas.messages import MessageCreate, MessageUpdate
 from src.application.errors import NotFoundError
@@ -27,6 +28,7 @@ def create_message(db: Session, payload: MessageCreate) -> Message:
             recipient=payload.recipient,
             content=payload.content,
             campaign_id=payload.campaign_id,
+            workspace_id=campaign.workspace_id,
         )
         db.commit()
         db.refresh(message)
@@ -40,7 +42,7 @@ def get_messages(
     db: Session,
     skip: int = 0,
     limit: int = 100,
-    campaign_id: int | None = None,
+    campaign_id: UUID | None = None,
     status: MessageStatus | None = None,
 ):
     return list_messages_filtered(
@@ -48,14 +50,14 @@ def get_messages(
     )
 
 
-def get_message(message_id: int, db: Session):
+def get_message(message_id: UUID, db: Session):
     message = get_message_by_id(db, message_id)
     if not message:
         raise NotFoundError("Message not found")
     return message
 
 
-def remove_message(message_id: int, db: Session):
+def remove_message(message_id: UUID, db: Session):
     message = get_message_by_id(db, message_id)
     if not message:
         raise NotFoundError("Message not found")
@@ -67,7 +69,7 @@ def remove_message(message_id: int, db: Session):
         raise exc
 
 
-def update_message_item(message_id: int, payload: MessageUpdate, db: Session) -> Message:
+def update_message_item(message_id: UUID, payload: MessageUpdate, db: Session) -> Message:
     message = get_message_by_id(db, message_id)
     if not message:
         raise NotFoundError("Message not found")

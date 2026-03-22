@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query, Response, status
+from uuid import UUID
 from sqlalchemy.orm import Session
 
 from src.api.routes.deps import get_db
@@ -27,7 +28,7 @@ def list_items(
     db: Session = Depends(get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    campaign_id: int | None = Query(default=None),
+    campaign_id: UUID | None = Query(default=None),
     status: MessageStatus | None = Query(default=None),
 ):
     items = get_messages(
@@ -39,19 +40,19 @@ def list_items(
 
 
 @router.get("/{message_id}", response_model=MessageRead)
-def get_item(message_id: int, db: Session = Depends(get_db)):
+def get_item(message_id: UUID, db: Session = Depends(get_db)):
     return get_message(message_id, db)
 
 
 @router.delete("/{message_id}", status_code=status.HTTP_200_OK)
-def delete_item(message_id: int, db: Session = Depends(get_db)):
+def delete_item(message_id: UUID, db: Session = Depends(get_db)):
     remove_message(message_id, db)
     return {"detail": "Message deleted successfully"}
 
 
 @router.patch("/{message_id}", response_model=MessageRead)
 def update_item(
-    message_id: int,
+    message_id: UUID,
     payload: MessageUpdate,
     db: Session = Depends(get_db)
 ):

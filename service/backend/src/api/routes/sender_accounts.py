@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, status
+from uuid import UUID
 from sqlalchemy.orm import Session
 
 from src.api.routes.deps import get_db
@@ -39,16 +40,16 @@ def list_items(db: Session = Depends(get_db)):
 
 
 @router.get("/{sender_id}", response_model=SenderAccountRead)
-def get_item(sender_id: int, db: Session = Depends(get_db)):
+def get_item(sender_id: UUID, db: Session = Depends(get_db)):
     return get_sender_usecase(sender_id, db)
 
 
 @router.delete("/{sender_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_item(sender_id: int, db: Session = Depends(get_db)):
+def delete_item(sender_id: UUID, db: Session = Depends(get_db)):
     remove_sender_usecase(sender_id, db)
     return None
 
 
 @router.post("/{sender_id}/reset-session", response_model=SenderAccountRead)
-def reset_session(sender_id: int, db: Session = Depends(get_db)):
+def reset_session(sender_id: UUID, db: Session = Depends(get_db)):
     return reset_sender_usecase(sender_id, db)

@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import UUID
 from sqlalchemy import func
 
 from fastapi import UploadFile
@@ -15,6 +16,7 @@ from src.api.service.campaigns import (
     update_campaign as update_campaign_service,
 )
 from src.api.service.messages import create_messages, reset_messages_by_campaign
+from src.api.service.workspaces import get_default_workspace_id
 from src.domain.models import Campaign, SenderAccount, Message
 from src.domain import CampaignStatus, SenderAccountStatus, MessageStatus
 from src.infrastructure.file_readers.factory import get_reader
@@ -38,7 +40,8 @@ def create_campaign_with_file(name: str, file: UploadFile | None, db: Session):
         _ensure_unique_campaign_name(db, name)
 
         # Create campaign
-        campaign = create_campaign(db, CampaignCreate(name=name))
+        workspace_id = get_default_workspace_id(db)
+        campaign = create_campaign(db, CampaignCreate(name=name), workspace_id)
         db.flush()
 
         # If there's no file, just commit and return with empty summary
@@ -66,6 +69,7 @@ def create_campaign_with_file(name: str, file: UploadFile | None, db: Session):
                 recipient=recipient,
                 content=content,
                 campaign_id=campaign.id,
+                workspace_id=workspace_id,
                 allow_duplicate=True,
             )
             if message:
@@ -91,7 +95,8 @@ def create_campaigns(db: Session, payload: CampaignCreate) -> Campaign:
                 "Campaign status can only start as CREATED or PAUSED"
             )
 
-        campaign = create_campaign(db, payload)
+        workspace_id = get_default_workspace_id(db)
+        campaign = create_campaign(db, payload, workspace_id)
         db.commit()
         db.refresh(campaign)
         return campaign
@@ -104,14 +109,14 @@ def get_campaigns(db: Session):
     return list_campaigns(db)
 
 
-def get_campaign(campaign_id: int, db: Session):
+def get_campaign(campaign_id: UUID, db: Session):
     campaign = get_campaign_by_id(db, campaign_id)
     if not campaign:
         raise NotFoundError("Campaign not found")
     return campaign
 
 
-def update_campaign(campaign_id: int, payload: CampaignUpdate, db: Session):
+def update_campaign(campaign_id: UUID, payload: CampaignUpdate, db: Session):
     campaign = get_campaign_by_id(db, campaign_id)
     if not campaign:
         raise NotFoundError("Campaign not found")
@@ -131,7 +136,7 @@ def update_campaign(campaign_id: int, payload: CampaignUpdate, db: Session):
         raise exc
 
 
-def remove_campaign(campaign_id: int, db: Session):
+def remove_campaign(campaign_id: UUID, db: Session):
     campaign = get_campaign_by_id(db, campaign_id)
     if not campaign:
         raise NotFoundError("Campaign not found")
@@ -149,7 +154,7 @@ def remove_campaign(campaign_id: int, db: Session):
     }
 
 
-def dispatch_campaign(campaign_id: int, db: Session) -> dict[str, int]:
+def dispatch_campaign(campaign_id: UUID, db: Session) -> dict[str, str]:
     campaign = get_campaign_by_id(db, campaign_id)
     if not campaign:
         raise NotFoundError("Campaign not found")
@@ -182,7 +187,7 @@ def dispatch_campaign(campaign_id: int, db: Session) -> dict[str, int]:
         raise exc
 
 
-def pause_campaign(campaign_id: int, db: Session) -> dict[str, int]:
+def pause_campaign(campaign_id: UUID, db: Session) -> dict[str, str]:
     campaign = get_campaign_by_id(db, campaign_id)
     if not campaign:
         raise NotFoundError("Campaign not found")
@@ -199,7 +204,7 @@ def pause_campaign(campaign_id: int, db: Session) -> dict[str, int]:
         raise exc
 
 
-def retry_campaign(campaign_id: int, db: Session) -> dict[str, int]:
+def retry_campaign(campaign_id: UUID, db: Session) -> dict[str, int]:
     campaign = get_campaign_by_id(db, campaign_id)
     if not campaign:
         raise NotFoundError("Campaign not found")
@@ -232,7 +237,7 @@ def retry_campaign(campaign_id: int, db: Session) -> dict[str, int]:
         raise exc
 
 
-def get_campaign_metrics(campaign_id: int, db: Session) -> dict[str, int | float]:
+def get_campaign_metrics(campaign_id: UUID, db: Session) -> dict[str, int | float]:
     campaign = get_campaign_by_id(db, campaign_id)
     if not campaign:
         raise NotFoundError("Campaign not found")
