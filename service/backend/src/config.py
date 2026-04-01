@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     auto_create_schema: bool = False
     seed_superuser: bool = True
+    superuser_username: str = "admin"
     superuser_email: str = "admin@relay.com"
     superuser_password: str = "admin123"
     jwt_secret: str = ""

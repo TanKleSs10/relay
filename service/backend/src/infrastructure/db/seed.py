@@ -53,6 +53,7 @@ def seed_default_data(db: Session) -> None:
     user = db.query(User).filter(User.email == settings.superuser_email).first()
     if not user:
         user = User(
+            username=settings.superuser_username,
             email=settings.superuser_email,
             password_hash=hash_password(settings.superuser_password),
             status=UserStatus.ACTIVE,

@@ -85,6 +85,7 @@ def upgrade() -> None:
             primary_key=True,
             server_default=sa.text("gen_random_uuid()"),
         ),
+        sa.Column("username", sa.String(length=80), nullable=False, unique=True),
         sa.Column("email", sa.String(length=255), nullable=False, unique=True),
         sa.Column("password_hash", sa.Text(), nullable=False),
         sa.Column(

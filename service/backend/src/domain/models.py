@@ -86,6 +86,7 @@ class User(Base):
     id: Mapped[PyUUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
     )
+    username: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[UserStatus] = mapped_column(
