@@ -13,14 +13,12 @@ from src.api.service.sender_accounts import (
     reset_sender_session,
     update_sender_account,
 )
-from src.api.service.workspaces import get_default_workspace_id
 from src.domain import SenderAccount
 
 
 def create_sender(db: Session, payload: SenderAccountCreate | None = None) -> SenderAccount:
     try:
-        workspace_id = get_default_workspace_id(db)
-        sender = create_sender_account(db, workspace_id, payload)
+        sender = create_sender_account(db, payload)
         db.commit()
         db.refresh(sender)
         return sender

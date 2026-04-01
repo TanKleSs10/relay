@@ -24,7 +24,7 @@ Track the work in small, incremental steps. Each task should be completed before
 - [ ] Add `permissions` read-only endpoint.
 - [ ] Add mapping service for role-permission updates.
 
-## Workspace
+## Workspace (Phase 3 / deferred)
 
 - [ ] Add `workspaces` service (create/list).
 - [ ] Add `workspace_members` service (add/remove users).

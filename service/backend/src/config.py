@@ -13,8 +13,6 @@ class Settings(BaseSettings):
     seed_superuser: bool = True
     superuser_email: str = "admin@relay.com"
     superuser_password: str = "admin123"
-    default_workspace_name: str = "My Workspace"
-    default_workspace_slug: str = "my_workspace"
     jwt_secret: str = ""
     jwt_expires_minutes: int = 120
     jwt_cookie_name: str = "relay_access"

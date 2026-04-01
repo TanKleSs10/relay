@@ -14,7 +14,6 @@ class MessageCreate(APIModel):
 
 class MessageRead(APIModel):
     id: UUID4
-    workspace_id: UUID4
     campaign_id: UUID4
     recipient: str
     content: str

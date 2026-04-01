@@ -28,7 +28,6 @@ def create_message(db: Session, payload: MessageCreate) -> Message:
             recipient=payload.recipient,
             content=payload.content,
             campaign_id=payload.campaign_id,
-            workspace_id=campaign.workspace_id,
         )
         db.commit()
         db.refresh(message)

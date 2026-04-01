@@ -26,21 +26,6 @@ class UserStatus(str, Enum):
     INACTIVE = "INACTIVE"
 
 
-class WorkspaceStatus(str, Enum):
-    ACTIVE = "ACTIVE"
-    ARCHIVED = "ARCHIVED"
-
-
-class WorkspaceMemberRole(str, Enum):
-    OWNER = "OWNER"
-    OPERATOR = "OPERATOR"
-
-
-class WorkspaceMemberStatus(str, Enum):
-    ACTIVE = "ACTIVE"
-    INACTIVE = "INACTIVE"
-
-
 class CampaignStatus(str, Enum):
     CREATED = "CREATED"
     ACTIVE = "ACTIVE"
@@ -120,9 +105,6 @@ class User(Base):
 
     roles: Mapped[list["UserRole"]] = relationship(
         "UserRole", back_populates="user", cascade="all, delete-orphan"
-    )
-    workspace_memberships: Mapped[list["WorkspaceMember"]] = relationship(
-        "WorkspaceMember", back_populates="user", cascade="all, delete-orphan"
     )
 
 
@@ -208,74 +190,11 @@ class UserRole(Base):
     role: Mapped[Role] = relationship("Role", back_populates="users")
 
 
-class Workspace(Base):
-    __tablename__ = "workspaces"
-
-    id: Mapped[PyUUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
-    )
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    slug: Mapped[str] = mapped_column(String(150), nullable=False, unique=True)
-    status: Mapped[WorkspaceStatus] = mapped_column(
-        SAEnum(WorkspaceStatus, name="workspace_status"),
-        nullable=False,
-        default=WorkspaceStatus.ACTIVE,
-    )
-    created_by_user_id: Mapped[PyUUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id")
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-        onupdate=func.now(),
-    )
-
-    members: Mapped[list["WorkspaceMember"]] = relationship(
-        "WorkspaceMember", back_populates="workspace", cascade="all, delete-orphan"
-    )
-
-
-class WorkspaceMember(Base):
-    __tablename__ = "workspace_members"
-
-    id: Mapped[PyUUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
-    )
-    workspace_id: Mapped[PyUUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("workspaces.id"), nullable=False
-    )
-    user_id: Mapped[PyUUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
-    )
-    member_role: Mapped[WorkspaceMemberRole] = mapped_column(
-        SAEnum(WorkspaceMemberRole, name="workspace_member_role"),
-        nullable=False,
-    )
-    status: Mapped[WorkspaceMemberStatus] = mapped_column(
-        SAEnum(WorkspaceMemberStatus, name="workspace_member_status"),
-        nullable=False,
-        default=WorkspaceMemberStatus.ACTIVE,
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
-
-    workspace: Mapped[Workspace] = relationship("Workspace", back_populates="members")
-    user: Mapped[User] = relationship("User", back_populates="workspace_memberships")
-
-
 class Campaign(Base):
     __tablename__ = "campaigns"
 
     id: Mapped[PyUUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
-    )
-    workspace_id: Mapped[PyUUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("workspaces.id"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[CampaignStatus] = mapped_column(
@@ -308,9 +227,6 @@ class Message(Base):
 
     id: Mapped[PyUUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
-    )
-    workspace_id: Mapped[PyUUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("workspaces.id"), nullable=False
     )
     campaign_id: Mapped[PyUUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("campaigns.id"), nullable=False
@@ -358,9 +274,6 @@ class SenderAccount(Base):
     id: Mapped[PyUUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
     )
-    workspace_id: Mapped[PyUUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("workspaces.id"), nullable=False
-    )
     label: Mapped[str] = mapped_column(String(150), nullable=False)
     phone_number: Mapped[str | None] = mapped_column(String(50))
     status: Mapped[SenderAccountStatus] = mapped_column(
@@ -401,9 +314,6 @@ class SenderSession(Base):
     sender_account_id: Mapped[PyUUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("sender_accounts.id"), nullable=False, unique=True
     )
-    workspace_id: Mapped[PyUUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("workspaces.id"), nullable=False
-    )
     session_key: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     auth_dir: Mapped[str | None] = mapped_column(Text)
     browser_pid: Mapped[int | None] = mapped_column(Integer)
@@ -442,9 +352,6 @@ class SessionLog(Base):
     id: Mapped[PyUUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
     )
-    workspace_id: Mapped[PyUUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("workspaces.id"), nullable=False
-    )
     sender_account_id: Mapped[PyUUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("sender_accounts.id"), nullable=False
     )
@@ -472,9 +379,6 @@ class SendRule(Base):
     id: Mapped[PyUUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
     )
-    workspace_id: Mapped[PyUUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("workspaces.id"), nullable=False, unique=True
-    )
     max_messages_per_minute: Mapped[int] = mapped_column(Integer, nullable=False)
     cooldown_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
     random_delay_min_ms: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -497,9 +401,6 @@ class Worker(Base):
 
     id: Mapped[PyUUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
-    )
-    workspace_id: Mapped[PyUUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("workspaces.id")
     )
     worker_name: Mapped[str] = mapped_column(String(150), nullable=False, unique=True)
     worker_type: Mapped[WorkerType] = mapped_column(
@@ -527,9 +428,6 @@ class SendLog(Base):
 
     id: Mapped[PyUUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
-    )
-    workspace_id: Mapped[PyUUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("workspaces.id"), nullable=False
     )
     message_id: Mapped[PyUUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("messages.id"), nullable=False

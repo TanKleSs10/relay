@@ -8,7 +8,12 @@ from src.api.routes.messages import router as messages_router
 from src.api.routes.sender_accounts import router as sender_accounts_router
 from src.api.routes.auth import router as auth_router
 from src.api.routes.workers import router as workers_router
-from src.application.errors import ConflictError, NotFoundError, ValidationError, UnauthorizedError
+from src.application.errors import (
+    ConflictError,
+    NotFoundError,
+    ValidationError,
+    UnauthorizedError,
+)
 from src.config import get_settings
 from src.infrastructure.db.base import Base
 from src.infrastructure.db.session import SessionLocal, engine

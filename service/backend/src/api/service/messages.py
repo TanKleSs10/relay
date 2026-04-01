@@ -15,7 +15,6 @@ def create_messages(
     recipient: str,
     content: str,
     campaign_id: UUID,
-    workspace_id: UUID,
     allow_duplicate: bool = False,
 ) -> Message | None:
     normalized_recipient = normalize_mx_recipient(recipient)
@@ -37,7 +36,6 @@ def create_messages(
         recipient=normalized_recipient,
         content=content,
         campaign_id=campaign_id,
-        workspace_id=workspace_id,
         idempotency_key=idempotency_key,
         status=MessageStatus.PENDING,
     )

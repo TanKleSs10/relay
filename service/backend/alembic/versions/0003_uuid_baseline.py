@@ -26,21 +26,6 @@ def upgrade() -> None:
     )
     op.execute(
         """
-        CREATE TYPE workspace_status AS ENUM ('ACTIVE', 'ARCHIVED')
-        """
-    )
-    op.execute(
-        """
-        CREATE TYPE workspace_member_role AS ENUM ('OWNER', 'OPERATOR')
-        """
-    )
-    op.execute(
-        """
-        CREATE TYPE workspace_member_status AS ENUM ('ACTIVE', 'INACTIVE')
-        """
-    )
-    op.execute(
-        """
         CREATE TYPE sender_account_status AS ENUM (
             'CREATED',
             'INITIALIZING',
@@ -160,52 +145,6 @@ def upgrade() -> None:
     )
 
     op.create_table(
-        "workspaces",
-        sa.Column(
-            "id",
-            postgresql.UUID(as_uuid=True),
-            primary_key=True,
-            server_default=sa.text("gen_random_uuid()"),
-        ),
-        sa.Column("name", sa.String(length=255), nullable=False),
-        sa.Column("slug", sa.String(length=150), nullable=False, unique=True),
-        sa.Column(
-            "status",
-            postgresql.ENUM("ACTIVE", "ARCHIVED", name="workspace_status", create_type=False),
-            nullable=False,
-            server_default="ACTIVE",
-        ),
-        sa.Column("created_by_user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-    )
-
-    op.create_table(
-        "workspace_members",
-        sa.Column(
-            "id",
-            postgresql.UUID(as_uuid=True),
-            primary_key=True,
-            server_default=sa.text("gen_random_uuid()"),
-        ),
-        sa.Column("workspace_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("workspaces.id"), nullable=False),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
-        sa.Column(
-            "member_role",
-            postgresql.ENUM("OWNER", "OPERATOR", name="workspace_member_role", create_type=False),
-            nullable=False,
-        ),
-        sa.Column(
-            "status",
-            postgresql.ENUM("ACTIVE", "INACTIVE", name="workspace_member_status", create_type=False),
-            nullable=False,
-            server_default="ACTIVE",
-        ),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-        sa.UniqueConstraint("workspace_id", "user_id", name="workspace_members_unique"),
-    )
-
-    op.create_table(
         "sender_accounts",
         sa.Column(
             "id",
@@ -213,7 +152,6 @@ def upgrade() -> None:
             primary_key=True,
             server_default=sa.text("gen_random_uuid()"),
         ),
-        sa.Column("workspace_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("workspaces.id"), nullable=False),
         sa.Column("label", sa.String(length=150), nullable=False),
         sa.Column("phone_number", sa.String(length=50)),
         sa.Column(
@@ -251,7 +189,6 @@ def upgrade() -> None:
             server_default=sa.text("gen_random_uuid()"),
         ),
         sa.Column("sender_account_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("sender_accounts.id"), nullable=False, unique=True),
-        sa.Column("workspace_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("workspaces.id"), nullable=False),
         sa.Column("session_key", sa.String(length=255), nullable=False, unique=True),
         sa.Column("auth_dir", sa.Text()),
         sa.Column("browser_pid", sa.Integer()),
@@ -281,7 +218,6 @@ def upgrade() -> None:
             primary_key=True,
             server_default=sa.text("gen_random_uuid()"),
         ),
-        sa.Column("workspace_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("workspaces.id"), nullable=False),
         sa.Column("sender_account_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("sender_accounts.id"), nullable=False),
         sa.Column("sender_session_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("sender_sessions.id"), nullable=False),
         sa.Column(
@@ -311,7 +247,6 @@ def upgrade() -> None:
             primary_key=True,
             server_default=sa.text("gen_random_uuid()"),
         ),
-        sa.Column("workspace_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("workspaces.id"), nullable=False),
         sa.Column("name", sa.String(length=255), nullable=False),
         sa.Column(
             "status",
@@ -345,7 +280,6 @@ def upgrade() -> None:
             primary_key=True,
             server_default=sa.text("gen_random_uuid()"),
         ),
-        sa.Column("workspace_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("workspaces.id")),
         sa.Column("worker_name", sa.String(length=150), nullable=False, unique=True),
         sa.Column(
             "worker_type",
@@ -383,7 +317,6 @@ def upgrade() -> None:
             primary_key=True,
             server_default=sa.text("gen_random_uuid()"),
         ),
-        sa.Column("workspace_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("workspaces.id"), nullable=False),
         sa.Column("campaign_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("campaigns.id"), nullable=False),
         sa.Column("recipient", sa.String(length=50), nullable=False),
         sa.Column("content", sa.Text(), nullable=False),
@@ -423,7 +356,6 @@ def upgrade() -> None:
             primary_key=True,
             server_default=sa.text("gen_random_uuid()"),
         ),
-        sa.Column("workspace_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("workspaces.id"), nullable=False, unique=True),
         sa.Column("max_messages_per_minute", sa.Integer(), nullable=False),
         sa.Column("cooldown_seconds", sa.Integer(), nullable=False),
         sa.Column("random_delay_min_ms", sa.Integer(), nullable=False),
@@ -442,7 +374,6 @@ def upgrade() -> None:
             primary_key=True,
             server_default=sa.text("gen_random_uuid()"),
         ),
-        sa.Column("workspace_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("workspaces.id"), nullable=False),
         sa.Column("message_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("messages.id"), nullable=False),
         sa.Column("campaign_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("campaigns.id"), nullable=False),
         sa.Column("sender_account_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("sender_accounts.id"), nullable=False),
@@ -454,33 +385,23 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
     )
 
-    op.create_index("workspace_members_workspace_idx", "workspace_members", ["workspace_id"])
-    op.create_index("workspace_members_user_idx", "workspace_members", ["user_id"])
-    op.create_index("sender_accounts_workspace_status_idx", "sender_accounts", ["workspace_id", "status"])
+    op.create_index("sender_accounts_status_idx", "sender_accounts", ["status"])
     op.create_index("sender_sessions_health_idx", "sender_sessions", ["health_status"])
     op.create_index("sender_sessions_disconnect_idx", "sender_sessions", ["last_disconnect_at"])
     op.create_index("sender_sessions_heartbeat_idx", "sender_sessions", ["last_heartbeat_at"])
-    op.create_index("campaigns_workspace_status_idx", "campaigns", ["workspace_id", "status"])
-    op.create_index("messages_workspace_status_idx", "messages", ["workspace_id", "status"])
     op.create_index("messages_campaign_status_idx", "messages", ["campaign_id", "status"])
     op.create_index("messages_locked_idx", "messages", ["locked_at"])
-    op.create_index("send_logs_workspace_created_idx", "send_logs", ["workspace_id", "created_at"])
     op.create_index("session_logs_sender_created_idx", "session_logs", ["sender_account_id", "created_at"])
 
 
 def downgrade() -> None:
     op.drop_index("session_logs_sender_created_idx", table_name="session_logs")
-    op.drop_index("send_logs_workspace_created_idx", table_name="send_logs")
     op.drop_index("messages_locked_idx", table_name="messages")
     op.drop_index("messages_campaign_status_idx", table_name="messages")
-    op.drop_index("messages_workspace_status_idx", table_name="messages")
-    op.drop_index("campaigns_workspace_status_idx", table_name="campaigns")
     op.drop_index("sender_sessions_heartbeat_idx", table_name="sender_sessions")
     op.drop_index("sender_sessions_disconnect_idx", table_name="sender_sessions")
     op.drop_index("sender_sessions_health_idx", table_name="sender_sessions")
-    op.drop_index("sender_accounts_workspace_status_idx", table_name="sender_accounts")
-    op.drop_index("workspace_members_user_idx", table_name="workspace_members")
-    op.drop_index("workspace_members_workspace_idx", table_name="workspace_members")
+    op.drop_index("sender_accounts_status_idx", table_name="sender_accounts")
     op.drop_table("send_logs")
     op.drop_table("workers")
     op.drop_table("send_rules")
@@ -489,8 +410,6 @@ def downgrade() -> None:
     op.drop_table("session_logs")
     op.drop_table("sender_sessions")
     op.drop_table("sender_accounts")
-    op.drop_table("workspace_members")
-    op.drop_table("workspaces")
     op.drop_table("user_roles")
     op.drop_table("role_permissions")
     op.drop_table("permissions")
@@ -504,7 +423,4 @@ def downgrade() -> None:
     op.execute("DROP TYPE IF EXISTS campaign_status")
     op.execute("DROP TYPE IF EXISTS sender_session_health")
     op.execute("DROP TYPE IF EXISTS sender_account_status")
-    op.execute("DROP TYPE IF EXISTS workspace_member_status")
-    op.execute("DROP TYPE IF EXISTS workspace_member_role")
-    op.execute("DROP TYPE IF EXISTS workspace_status")
     op.execute("DROP TYPE IF EXISTS user_status")

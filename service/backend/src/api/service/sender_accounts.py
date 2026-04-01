@@ -23,7 +23,7 @@ def list_sender_accounts(db: Session) -> list[SenderAccount]:
 
 
 def create_sender_account(
-    db: Session, workspace_id: UUID, payload: SenderAccountCreate | None = None
+    db: Session, payload: SenderAccountCreate | None = None
 ) -> SenderAccount:
     label = None
     if payload:
@@ -31,7 +31,6 @@ def create_sender_account(
     if not label:
         label = f"Sender {uuid4().hex[:8]}"
     sender = SenderAccount(
-        workspace_id=workspace_id,
         label=label,
         status=SenderAccountStatus.CREATED,
         phone_number=None,

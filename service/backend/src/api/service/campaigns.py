@@ -8,13 +8,10 @@ from src.api.schemas.campaigns import CampaignCreate, CampaignUpdate
 from src.domain import Campaign, CampaignStatus
 
 
-def create_campaign(
-    db: Session, payload: CampaignCreate, workspace_id: UUID
-) -> Campaign:
+def create_campaign(db: Session, payload: CampaignCreate) -> Campaign:
     campaign = Campaign(
         name=payload.name,
         status=payload.status or CampaignStatus.CREATED,
-        workspace_id=workspace_id,
     )
     db.add(campaign)
     return campaign

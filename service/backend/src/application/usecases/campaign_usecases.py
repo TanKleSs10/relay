@@ -16,7 +16,6 @@ from src.api.service.campaigns import (
     update_campaign as update_campaign_service,
 )
 from src.api.service.messages import create_messages, reset_messages_by_campaign
-from src.api.service.workspaces import get_default_workspace_id
 from src.domain.models import Campaign, SenderAccount, Message
 from src.domain import CampaignStatus, SenderAccountStatus, MessageStatus
 from src.infrastructure.file_readers.factory import get_reader
@@ -40,8 +39,7 @@ def create_campaign_with_file(name: str, file: UploadFile | None, db: Session):
         _ensure_unique_campaign_name(db, name)
 
         # Create campaign
-        workspace_id = get_default_workspace_id(db)
-        campaign = create_campaign(db, CampaignCreate(name=name), workspace_id)
+        campaign = create_campaign(db, CampaignCreate(name=name))
         db.flush()
 
         # If there's no file, just commit and return with empty summary
@@ -69,7 +67,6 @@ def create_campaign_with_file(name: str, file: UploadFile | None, db: Session):
                 recipient=recipient,
                 content=content,
                 campaign_id=campaign.id,
-                workspace_id=workspace_id,
                 allow_duplicate=True,
             )
             if message:
@@ -95,8 +92,7 @@ def create_campaigns(db: Session, payload: CampaignCreate) -> Campaign:
                 "Campaign status can only start as CREATED or PAUSED"
             )
 
-        workspace_id = get_default_workspace_id(db)
-        campaign = create_campaign(db, payload, workspace_id)
+        campaign = create_campaign(db, payload)
         db.commit()
         db.refresh(campaign)
         return campaign

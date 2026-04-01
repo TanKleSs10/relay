@@ -7,9 +7,6 @@ from src.domain.models import (
     SenderSessionHealth,
     SessionLogEvent,
     UserStatus,
-    WorkspaceMemberRole,
-    WorkspaceMemberStatus,
-    WorkspaceStatus,
     WorkerStatus,
     WorkerType,
 )
@@ -21,9 +18,6 @@ ENUM_REGISTRY = {
     "sender_session_health": SenderSessionHealth,
     "session_log_event": SessionLogEvent,
     "user_status": UserStatus,
-    "workspace_member_role": WorkspaceMemberRole,
-    "workspace_member_status": WorkspaceMemberStatus,
-    "workspace_status": WorkspaceStatus,
     "worker_status": WorkerStatus,
     "worker_type": WorkerType,
 }

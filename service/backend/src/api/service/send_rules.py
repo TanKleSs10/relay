@@ -8,7 +8,6 @@ from src.domain import SendRule
 
 def create_send_rule(
     db: Session,
-    workspace_id: UUID,
     max_messages_per_minute: int,
     cooldown_seconds: int,
     random_delay_min_ms: int,
@@ -16,7 +15,6 @@ def create_send_rule(
     max_retries: int,
 ) -> SendRule:
     send_rule = SendRule(
-        workspace_id=workspace_id,
         max_messages_per_minute=max_messages_per_minute,
         cooldown_seconds=cooldown_seconds,
         random_delay_min_ms=random_delay_min_ms,

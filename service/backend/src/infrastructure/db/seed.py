@@ -10,17 +10,10 @@ from src.domain.models import (
     User,
     UserRole,
     UserStatus,
-    Workspace,
-    WorkspaceMember,
-    WorkspaceMemberRole,
-    WorkspaceMemberStatus,
 )
 from src.security.passwords import hash_password
 
 DEFAULT_PERMISSIONS = [
-    "workspace.create",
-    "workspace.read",
-    "workspace.manage_members",
     "sender.manage",
     "campaign.create",
     "campaign.dispatch",
@@ -33,19 +26,6 @@ def seed_default_data(db: Session) -> None:
     settings = get_settings()
     if not settings.seed_superuser:
         return
-
-    workspace = (
-        db.query(Workspace)
-        .filter(Workspace.slug == settings.default_workspace_slug)
-        .first()
-    )
-    if not workspace:
-        workspace = Workspace(
-            name=settings.default_workspace_name,
-            slug=settings.default_workspace_slug,
-        )
-        db.add(workspace)
-        db.flush()
 
     role_admin = db.query(Role).filter(Role.name == "ADMIN").first()
     if not role_admin:
@@ -87,23 +67,5 @@ def seed_default_data(db: Session) -> None:
     )
     if not user_role:
         db.add(UserRole(user_id=user.id, role_id=role_admin.id))
-
-    membership = (
-        db.query(WorkspaceMember)
-        .filter(
-            WorkspaceMember.workspace_id == workspace.id,
-            WorkspaceMember.user_id == user.id,
-        )
-        .first()
-    )
-    if not membership:
-        db.add(
-            WorkspaceMember(
-                workspace_id=workspace.id,
-                user_id=user.id,
-                member_role=WorkspaceMemberRole.OWNER,
-                status=WorkspaceMemberStatus.ACTIVE,
-            )
-        )
 
     db.commit()
