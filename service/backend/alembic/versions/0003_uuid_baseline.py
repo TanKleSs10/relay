@@ -338,6 +338,44 @@ def upgrade() -> None:
     )
 
     op.create_table(
+        "workers",
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=True),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
+        sa.Column("workspace_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("workspaces.id")),
+        sa.Column("worker_name", sa.String(length=150), nullable=False, unique=True),
+        sa.Column(
+            "worker_type",
+            postgresql.ENUM(
+                "QR",
+                "SESSION",
+                "CAMPAIGN",
+                name="worker_type",
+                create_type=False,
+            ),
+            nullable=False,
+        ),
+        sa.Column(
+            "status",
+            postgresql.ENUM(
+                "ONLINE",
+                "OFFLINE",
+                "BUSY",
+                name="worker_status",
+                create_type=False,
+            ),
+            nullable=False,
+            server_default="ONLINE",
+        ),
+        sa.Column("last_seen", sa.DateTime(timezone=True)),
+        sa.Column("started_at", sa.DateTime(timezone=True)),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+    )
+
+    op.create_table(
         "messages",
         sa.Column(
             "id",
@@ -394,44 +432,6 @@ def upgrade() -> None:
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-    )
-
-    op.create_table(
-        "workers",
-        sa.Column(
-            "id",
-            postgresql.UUID(as_uuid=True),
-            primary_key=True,
-            server_default=sa.text("gen_random_uuid()"),
-        ),
-        sa.Column("workspace_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("workspaces.id")),
-        sa.Column("worker_name", sa.String(length=150), nullable=False, unique=True),
-        sa.Column(
-            "worker_type",
-            postgresql.ENUM(
-                "QR",
-                "SESSION",
-                "CAMPAIGN",
-                name="worker_type",
-                create_type=False,
-            ),
-            nullable=False,
-        ),
-        sa.Column(
-            "status",
-            postgresql.ENUM(
-                "ONLINE",
-                "OFFLINE",
-                "BUSY",
-                name="worker_status",
-                create_type=False,
-            ),
-            nullable=False,
-            server_default="ONLINE",
-        ),
-        sa.Column("last_seen", sa.DateTime(timezone=True)),
-        sa.Column("started_at", sa.DateTime(timezone=True)),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
     )
 
     op.create_table(

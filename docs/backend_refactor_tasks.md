@@ -43,12 +43,15 @@ Track the work in small, incremental steps. Each task should be completed before
 - [ ] Add counters update logic (total/sent/failed) on message changes.
 - [ ] Add campaign metrics to dashboard endpoint (optional).
 - [ ] Add campaign FAILED handling (if needed).
+- [ ] Enforce campaign pause: stop dispatch when status is not ACTIVE.
+- [ ] Add external_id to messages for dedupe/traceability (if needed).
 
 ## Messages
 
 - [ ] Add `NO_WA` status handling in API responses.
 - [ ] Ensure idempotency_key is required in create/update.
 - [ ] Add `max_retries` usage in retry logic.
+- [ ] Validate UTF-8/emoji handling end-to-end (CSV -> DB -> API).
 
 ## Workers
 
@@ -59,3 +62,12 @@ Track the work in small, incremental steps. Each task should be completed before
 
 - [ ] Add `auth_middleware` tests (smoke).
 - [ ] Add seed verification command (optional).
+- [ ] Add basic healthcheck endpoint (API).
+- [ ] Add minimal CI/CD pipeline (build + deploy + healthcheck).
+- [ ] Add basic monitoring/auto-restart notes for production.
+
+## Session Stability
+
+- [ ] Track session health fields (restart_count, last_heartbeat_at, disconnect_reason).
+- [ ] Add watchdog/recovery for unhealthy sessions.
+- [ ] Log critical session events (blocked, auth failure, disconnect).

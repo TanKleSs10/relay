@@ -456,7 +456,7 @@ class SessionLog(Base):
         nullable=False,
     )
     reason: Mapped[str | None] = mapped_column(Text)
-    metadata: Mapped[dict | None] = mapped_column(JSONB)
+    metadata_: Mapped[dict | None] = mapped_column("metadata", JSONB)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
