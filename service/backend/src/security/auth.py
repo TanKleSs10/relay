@@ -43,3 +43,10 @@ def require_user(request: Request, db: Session = Depends(get_db)) -> User:
 
     request.state.user = user
     return user
+
+
+def require_admin(user: User = Depends(require_user)) -> User:
+    for user_role in user.roles:
+        if user_role.role and user_role.role.name == "ADMIN":
+            return user
+    raise UnauthorizedError("Admin access required")

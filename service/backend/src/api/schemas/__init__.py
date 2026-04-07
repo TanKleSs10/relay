@@ -13,6 +13,7 @@ from src.api.schemas.users import (
     UserCreate,
     UserRead,
     UserLogin,
+    UserStatusUpdate,
 )
 
 __all__ = [
@@ -25,4 +26,5 @@ __all__ = [
     "UserCreate",
     "UserRead",
     "UserLogin",
+    "UserStatusUpdate",
 ]

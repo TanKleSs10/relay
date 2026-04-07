@@ -8,21 +8,21 @@ from src.api.schemas.base import APIModel
 from src.domain import UserStatus
 
 
-class UserBase(APIModel):
+class UserCreate(APIModel):
     username: str = Field(..., min_length=3, max_length=80)
     email: EmailStr
-
-
-class UserCreate(UserBase):
     password: str = Field(..., min_length=8)
 
 
-class UserLogin(UserBase):
+class UserLogin(APIModel):
+    email: EmailStr
     password: str = Field(..., min_length=8)
 
 
-class UserRead(UserBase):
+class UserRead(APIModel):
     id: UUID4
+    username: str
+    email: EmailStr
     status: UserStatus
     created_at: datetime
 
@@ -32,3 +32,7 @@ class UserRead(UserBase):
         str_strip_whitespace=True,
         validate_assignment=True,
     )
+
+
+class UserStatusUpdate(APIModel):
+    status: UserStatus
