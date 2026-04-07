@@ -50,3 +50,17 @@ def require_admin(user: User = Depends(require_user)) -> User:
         if user_role.role and user_role.role.name == "ADMIN":
             return user
     raise UnauthorizedError("Admin access required")
+
+
+def require_permission(permission_code: str):
+    def _guard(user: User = Depends(require_user)) -> User:
+        for user_role in user.roles:
+            role = user_role.role
+            if not role:
+                continue
+            for role_perm in role.permissions:
+                if role_perm.permission and role_perm.permission.code == permission_code:
+                    return user
+        raise UnauthorizedError("Permission denied")
+
+    return _guard
