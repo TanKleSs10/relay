@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from src.application.errors import ConflictError, NotFoundError
-from src.domain.models import User, UserStatus
+from src.domain.models import Role, User, UserRole, UserStatus
 
 
 def get_user_by_email(db: Session, email: str) -> User:
@@ -25,6 +25,16 @@ def list_users(db: Session, skip: int = 0, limit: int = 100) -> list[User]:
         .limit(limit)
         .all()
     )
+
+
+def get_role_by_name(db: Session, name: str) -> Role | None:
+    return db.query(Role).filter(Role.name == name).first()
+
+
+def create_user_role(db: Session, user: User, role: Role) -> UserRole:
+    user_role = UserRole(user_id=user.id, role_id=role.id)
+    db.add(user_role)
+    return user_role
 
 
 def create_user(

@@ -21,6 +21,10 @@ DEFAULT_PERMISSIONS = [
     "campaign.manage",
 ]
 
+USER_PERMISSIONS = [
+    "sender.manage",
+]
+
 
 def seed_default_data(db: Session) -> None:
     settings = get_settings()
@@ -31,6 +35,12 @@ def seed_default_data(db: Session) -> None:
     if not role_admin:
         role_admin = Role(name="ADMIN")
         db.add(role_admin)
+        db.flush()
+
+    role_user = db.query(Role).filter(Role.name == "USER").first()
+    if not role_user:
+        role_user = Role(name="USER")
+        db.add(role_user)
         db.flush()
 
     for code in DEFAULT_PERMISSIONS:
@@ -49,6 +59,18 @@ def seed_default_data(db: Session) -> None:
         )
         if not exists:
             db.add(RolePermission(role_id=role_admin.id, permission_id=permission.id))
+
+        if code in USER_PERMISSIONS:
+            user_exists = (
+                db.query(RolePermission)
+                .filter(
+                    RolePermission.role_id == role_user.id,
+                    RolePermission.permission_id == permission.id,
+                )
+                .first()
+            )
+            if not user_exists:
+                db.add(RolePermission(role_id=role_user.id, permission_id=permission.id))
 
     user = db.query(User).filter(User.email == settings.superuser_email).first()
     if not user:

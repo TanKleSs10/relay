@@ -8,6 +8,8 @@ from src.api.schemas.users import UserCreate, UserStatusUpdate
 from src.api.service.user import (
     change_user_status,
     create_user,
+    get_role_by_name,
+    create_user_role,
     get_user_by_id,
     list_users,
 )
@@ -23,6 +25,10 @@ def create_user_usecase(db: Session, payload: UserCreate) -> User:
         email=payload.email,
         password_hash=hash_password(payload.password),
     )
+    role = get_role_by_name(db, "USER")
+    if not role:
+        raise NotFoundError("Default role USER not found")
+    create_user_role(db, user, role)
     db.commit()
     db.refresh(user)
     return user
