@@ -8,6 +8,8 @@ from src.api.routes.messages import router as messages_router
 from src.api.routes.sender_accounts import router as sender_accounts_router
 from src.api.routes.auth import router as auth_router
 from src.api.routes.users import router as users_router
+from src.api.routes.roles import router as roles_router
+from src.api.routes.permissions import router as permissions_router
 from src.api.routes.workers import router as workers_router
 from src.application.errors import (
     ConflictError,
@@ -29,6 +31,8 @@ logging.basicConfig(level=settings.log_level)
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(users_router)
+app.include_router(roles_router)
+app.include_router(permissions_router)
 app.include_router(campaigns_router)
 app.include_router(messages_router)
 app.include_router(sender_accounts_router)

@@ -15,6 +15,10 @@ from src.api.schemas.users import (
     UserLogin,
     UserStatusUpdate,
 )
+from src.api.schemas.roles import (
+    RoleRead,
+    PermissionRead,
+)
 
 __all__ = [
     "CampaignCreate",
@@ -27,4 +31,6 @@ __all__ = [
     "UserRead",
     "UserLogin",
     "UserStatusUpdate",
+    "RoleRead",
+    "PermissionRead",
 ]
