@@ -19,6 +19,11 @@ from src.api.schemas.roles import (
     RoleRead,
     PermissionRead,
 )
+from src.api.schemas.sender_sessions import (
+    SenderSessionRead,
+    SenderQrRead,
+    SessionLogRead,
+)
 
 __all__ = [
     "CampaignCreate",
@@ -33,4 +38,7 @@ __all__ = [
     "UserStatusUpdate",
     "RoleRead",
     "PermissionRead",
+    "SenderSessionRead",
+    "SenderQrRead",
+    "SessionLogRead",
 ]

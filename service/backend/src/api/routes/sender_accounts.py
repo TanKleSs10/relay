@@ -7,6 +7,11 @@ from src.api.schemas.sender_accounts import (
     SenderAccountCreate,
     SenderAccountRead,
 )
+from src.api.schemas.sender_sessions import (
+    SenderSessionRead,
+    SenderQrRead,
+    SessionLogRead,
+)
 from src.application.usecases.sender_account_usecases import (
     create_sender as create_sender_usecase,
     get_sender as get_sender_usecase,
@@ -14,6 +19,7 @@ from src.application.usecases.sender_account_usecases import (
     remove_sender as remove_sender_usecase,
     reset_sender as reset_sender_usecase,
 )
+from src.api.service.sender_sessions import get_sender_session, list_session_logs
 from src.security.auth import require_permission
 from src.security.permissions import PERM_SENDER_MANAGE
 
@@ -74,3 +80,40 @@ def reset_session(
     _: object = Depends(require_permission(PERM_SENDER_MANAGE)),
 ):
     return reset_sender_usecase(sender_id, db)
+
+
+@router.get("/{sender_id}/session", response_model=SenderSessionRead | None)
+def get_session(
+    sender_id: UUID,
+    db: Session = Depends(get_db),
+    _: object = Depends(require_permission(PERM_SENDER_MANAGE)),
+):
+    session = get_sender_session(db, sender_id)
+    if not session:
+        return None
+    return session
+
+
+@router.get("/{sender_id}/qr", response_model=SenderQrRead)
+def get_qr(
+    sender_id: UUID,
+    db: Session = Depends(get_db),
+    _: object = Depends(require_permission(PERM_SENDER_MANAGE)),
+):
+    session = get_sender_session(db, sender_id)
+    if not session:
+        return {"sender_account_id": sender_id, "qr_code": None, "qr_generated_at": None}
+    return {
+        "sender_account_id": sender_id,
+        "qr_code": session.qr_code,
+        "qr_generated_at": session.qr_generated_at,
+    }
+
+
+@router.get("/{sender_id}/session/logs", response_model=list[SessionLogRead])
+def get_session_logs(
+    sender_id: UUID,
+    db: Session = Depends(get_db),
+    _: object = Depends(require_permission(PERM_SENDER_MANAGE)),
+):
+    return list_session_logs(db, sender_id)
