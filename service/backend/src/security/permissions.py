@@ -1,0 +1,5 @@
+PERM_SENDER_MANAGE = "sender.manage"
+PERM_CAMPAIGN_CREATE = "campaign.create"
+PERM_CAMPAIGN_DISPATCH = "campaign.dispatch"
+PERM_CAMPAIGN_READ = "campaign.read"
+PERM_CAMPAIGN_MANAGE = "campaign.manage"

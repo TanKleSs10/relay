@@ -1,22 +1,25 @@
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
+from uuid import UUID
 
 from src.domain import SendRule
 
 
 def create_send_rule(
     db: Session,
-    messages_per_minute: int,
-    delay_between_messages: int,
-    active_senders: int,
-    queue_size: int,
+    max_messages_per_minute: int,
+    cooldown_seconds: int,
+    random_delay_min_ms: int,
+    random_delay_max_ms: int,
+    max_retries: int,
 ) -> SendRule:
     send_rule = SendRule(
-        messages_per_minute=messages_per_minute,
-        delay_between_messages=delay_between_messages,
-        active_senders=active_senders,
-        queue_size=queue_size,
+        max_messages_per_minute=max_messages_per_minute,
+        cooldown_seconds=cooldown_seconds,
+        random_delay_min_ms=random_delay_min_ms,
+        random_delay_max_ms=random_delay_max_ms,
+        max_retries=max_retries,
     )
     db.add(send_rule)
     db.commit()
@@ -24,7 +27,7 @@ def create_send_rule(
     return send_rule
 
 
-def get_send_rule_by_id(db: Session, send_rule_id: int) -> SendRule | None:
+def get_send_rule_by_id(db: Session, send_rule_id: UUID) -> SendRule | None:
     return db.query(SendRule).filter(SendRule.id == send_rule_id).first()
 
 

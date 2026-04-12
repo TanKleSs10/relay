@@ -18,15 +18,17 @@ Provide a reliable workflow to:
 - Campaign creation and CSV ingestion.
 - Background dispatch with rotation and throttling.
 - Campaign status tracking and retry.
+- Admin/user authentication with basic roles.
 
-Out of scope: authentication/roles, multi‑tenant, billing, public API, SMS/email.
+Out of scope: multi‑tenant workspaces, billing, public API, SMS/email.
 
 ## User flow
-1) Create a campaign.
-2) Upload a CSV of recipients and messages.
-3) Register sender numbers (QR).
-4) Dispatch the campaign.
-5) Track status and retry failures if needed.
+1) Admin creates users (ADMIN or USER).
+2) Create a campaign.
+3) Upload a CSV of recipients and messages.
+4) Register sender numbers (QR).
+5) Dispatch the campaign.
+6) Track status and retry failures if needed.
 
 ## Architecture overview
 ```
@@ -61,5 +63,7 @@ Example usage:
 
 ## Status
 
-The MVP is functional and ready for controlled testing. The next phase is
-hardening (observability, retries, compliance) and scaling throughput.
+The MVP is functional and ready for controlled testing. Current focus:
+- access control (roles/permissions),
+- session stability and observability,
+- minimal CI/CD for cloud deployment.

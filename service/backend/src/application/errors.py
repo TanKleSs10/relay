@@ -15,3 +15,7 @@ class ConflictError(AppError):
 
 class ValidationError(AppError):
     """Requested operation is invalid given the input."""
+
+
+class UnauthorizedError(AppError):
+    """Authentication required or invalid credentials."""

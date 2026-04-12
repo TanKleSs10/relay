@@ -9,6 +9,22 @@ from src.api.schemas.sender_accounts import (
     SenderAccountUpdate,
 )
 
+from src.api.schemas.users import (
+    UserCreate,
+    UserRead,
+    UserLogin,
+    UserStatusUpdate,
+)
+from src.api.schemas.roles import (
+    RoleRead,
+    PermissionRead,
+)
+from src.api.schemas.sender_sessions import (
+    SenderSessionRead,
+    SenderQrRead,
+    SessionLogRead,
+)
+
 __all__ = [
     "CampaignCreate",
     "CampaignRead",
@@ -16,4 +32,13 @@ __all__ = [
     "SenderAccountCreate",
     "SenderAccountRead",
     "SenderAccountUpdate",
+    "UserCreate",
+    "UserRead",
+    "UserLogin",
+    "UserStatusUpdate",
+    "RoleRead",
+    "PermissionRead",
+    "SenderSessionRead",
+    "SenderQrRead",
+    "SessionLogRead",
 ]

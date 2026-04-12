@@ -2,6 +2,7 @@ from __future__ import annotations
 
 
 from sqlalchemy.orm import Session, joinedload
+from uuid import UUID
 
 from src.api.schemas.campaigns import CampaignCreate, CampaignUpdate
 from src.domain import Campaign, CampaignStatus
@@ -20,7 +21,7 @@ def get_campaign_by_name(db: Session, name: str) -> Campaign | None:
     return db.query(Campaign).filter(Campaign.name == name).first()
 
 
-def get_campaign_by_id(db: Session, campaign_id: int) -> Campaign | None:
+def get_campaign_by_id(db: Session, campaign_id: UUID) -> Campaign | None:
     return (
         db.query(Campaign)
         .options(joinedload(Campaign.messages))
