@@ -1,9 +1,7 @@
 from __future__ import annotations
-
 from datetime import datetime
 from uuid import UUID as PyUUID
 from enum import Enum
-
 from sqlalchemy import (
     Boolean,
     DateTime,
@@ -17,7 +15,6 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
 from src.infrastructure.db.base import Base
 
 
@@ -67,6 +64,7 @@ class SessionLogEvent(str, Enum):
     AUTH_FAILURE = "AUTH_FAILURE"
     RESTARTED = "RESTARTED"
     DEAD = "DEAD"
+
 
 class WorkerType(str, Enum):
     QR = "QR"
@@ -235,7 +233,9 @@ class Message(Base):
     recipient: Mapped[str] = mapped_column(String(50), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     external_id: Mapped[str | None] = mapped_column(String(120))
-    idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    idempotency_key: Mapped[str] = mapped_column(
+        String(64), nullable=False, unique=True
+    )
     status: Mapped[MessageStatus] = mapped_column(
         SAEnum(MessageStatus, name="message_status"),
         nullable=False,
@@ -314,7 +314,10 @@ class SenderSession(Base):
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
     )
     sender_account_id: Mapped[PyUUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("sender_accounts.id"), nullable=False, unique=True
+        UUID(as_uuid=True),
+        ForeignKey("sender_accounts.id"),
+        nullable=False,
+        unique=True,
     )
     session_key: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     auth_dir: Mapped[str | None] = mapped_column(Text)
@@ -342,7 +345,9 @@ class SenderSession(Base):
         onupdate=func.now(),
     )
 
-    sender: Mapped[SenderAccount] = relationship("SenderAccount", back_populates="session")
+    sender: Mapped[SenderAccount] = relationship(
+        "SenderAccount", back_populates="session"
+    )
     logs: Mapped[list["SessionLog"]] = relationship(
         "SessionLog", back_populates="sender_session", cascade="all, delete-orphan"
     )
@@ -438,7 +443,10 @@ class SendLog(Base):
         UUID(as_uuid=True), ForeignKey("campaigns.id"), nullable=False
     )
     sender_id: Mapped[PyUUID] = mapped_column(
-        "sender_account_id", UUID(as_uuid=True), ForeignKey("sender_accounts.id"), nullable=False
+        "sender_account_id",
+        UUID(as_uuid=True),
+        ForeignKey("sender_accounts.id"),
+        nullable=False,
     )
     worker_id: Mapped[PyUUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("workers.id"), nullable=False
