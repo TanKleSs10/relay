@@ -32,7 +32,7 @@ export class WorkerRepository implements WorkerRepositoryPort {
     return WorkerEntity.fromRow(result.rows[0]);
   }
 
-  async updateStatus(workerId: number, status: WorkerStatus): Promise<WorkerEntity> {
+  async updateStatus(workerId: string, status: WorkerStatus): Promise<WorkerEntity> {
     const result = await this.pool.query(
       "UPDATE workers SET status = $2, last_seen = NOW() WHERE id = $1 RETURNING id, worker_name, worker_type, status, last_seen, started_at",
       [workerId, status]

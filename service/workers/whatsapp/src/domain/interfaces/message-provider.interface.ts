@@ -1,10 +1,10 @@
 export interface MessageProvider {
-  initialize(senderId: number): Promise<void>;
-  sendMessage(senderId: number, to: string, message: string): Promise<void>;
-  onQr?(senderId: number, callback: (qr: string) => void): void;
-  onReady?(senderId: number, callback: (phoneNumber: string | null) => void): void;
-  onDisconnect?(senderId: number, callback: () => void): void;
-  clear?(senderId: number): Promise<void> | void;
-  listSenderIds?(): number[];
-  getState?(senderId: number): Promise<string | null>;
+  initialize(senderId: string): Promise<void>;
+  sendMessage(senderId: string, to: string, message: string): Promise<void>;
+  onQr?(senderId: string, callback: (qr: string) => void): void;
+  onReady?(senderId: string, callback: (phoneNumber: string | null) => void): void;
+  onDisconnect?(senderId: string, callback: () => void): void;
+  clear?(senderId: string): Promise<void> | void;
+  listSenderIds?(): string[];
+  getState?(senderId: string): Promise<string | null>;
 }

@@ -7,5 +7,5 @@ export interface WorkerRepository {
     workerName: string,
     status: WorkerStatus
   ): Promise<WorkerEntity>;
-  updateStatus(workerId: number, status: WorkerStatus): Promise<WorkerEntity>;
+  updateStatus(workerId: string, status: WorkerStatus): Promise<WorkerEntity>;
 }

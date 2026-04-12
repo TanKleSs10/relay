@@ -107,7 +107,7 @@ async function syncSessions(
   }
 }
 
-async function cleanupAuthState(senderId: number, logger: Logger): Promise<void> {
+async function cleanupAuthState(senderId: string, logger: Logger): Promise<void> {
   const sessionPath = join(AUTH_DATA_PATH, `session-sender-${senderId}`);
   try {
     await rm(sessionPath, { recursive: true, force: true });

@@ -13,9 +13,9 @@ type SenderEntry = {
 
 // Adapter that isolates whatsapp-web.js usage behind MessageProvider.
 export class WhatsAppProvider implements MessageProvider {
-  private clients = new Map<number, SenderEntry>();
+  private clients = new Map<string, SenderEntry>();
 
-  async initialize(senderId: number): Promise<void> {
+  async initialize(senderId: string): Promise<void> {
     // Create or reuse a client for a sender and forward events to callbacks.
     const existing = this.clients.get(senderId);
     if (existing?.client || existing?.initializing) {
@@ -100,7 +100,7 @@ export class WhatsAppProvider implements MessageProvider {
     }
   }
 
-  async sendMessage(senderId: number, to: string, message: string): Promise<void> {
+  async sendMessage(senderId: string, to: string, message: string): Promise<void> {
     const entry = this.clients.get(senderId);
     if (!entry?.client) {
       throw new Error(`Sender ${senderId} is not initialized`);
@@ -115,32 +115,32 @@ export class WhatsAppProvider implements MessageProvider {
     await entry.client.sendMessage(recipient, message);
   }
 
-  onQr(senderId: number, callback: (qr: string) => void): void {
+  onQr(senderId: string, callback: (qr: string) => void): void {
     // Register QR callback before or after initialize.
     const entry = this.clients.get(senderId) ?? {};
     entry.onQr = callback;
     this.clients.set(senderId, entry);
   }
 
-  onReady(senderId: number, callback: (phoneNumber: string | null) => void): void {
+  onReady(senderId: string, callback: (phoneNumber: string | null) => void): void {
     // Register ready callback before or after initialize.
     const entry = this.clients.get(senderId) ?? {};
     entry.onReady = callback;
     this.clients.set(senderId, entry);
   }
 
-  onDisconnect(senderId: number, callback: () => void): void {
+  onDisconnect(senderId: string, callback: () => void): void {
     // Register disconnect callback before or after initialize.
     const entry = this.clients.get(senderId) ?? {};
     entry.onDisconnect = callback;
     this.clients.set(senderId, entry);
   }
 
-  async clear(senderId: number): Promise<void> {
+  async clear(senderId: string): Promise<void> {
     const entry = this.clients.get(senderId);
     if (entry?.client) {
       try {
-        await entry.client.destroy();
+        await (entry.client as any).destroy();
       } catch (error) {
         console.warn(`Failed to destroy client for sender ${senderId}`, error);
       }
@@ -148,11 +148,11 @@ export class WhatsAppProvider implements MessageProvider {
     this.clients.delete(senderId);
   }
 
-  listSenderIds(): number[] {
+  listSenderIds(): string[] {
     return Array.from(this.clients.keys());
   }
 
-  async getState(senderId: number): Promise<string | null> {
+  async getState(senderId: string): Promise<string | null> {
     const entry = this.clients.get(senderId);
     if (!entry?.client || entry.initializing) {
       return null;
@@ -162,7 +162,7 @@ export class WhatsAppProvider implements MessageProvider {
       return null;
     }
     try {
-      return await entry.client.getState();
+      return await clientAny.getState();
     } catch (error) {
       console.warn(`Failed to get state for sender ${senderId}`, error);
       return null;

@@ -21,13 +21,13 @@ const MAX_INIT_RETRIES = 3;
 const PROCESSING_LOCK_WINDOW_MIN = 5;
 
 export class CampaignManager {
-  private failureStreaks = new Map<number, number>();
-  private cachedCampaignId: number | null = null;
+  private failureStreaks = new Map<string, number>();
+  private cachedCampaignId: string | null = null;
   private cachedQueue: MessageRow[] = [];
   private roundRobinIndex = 0;
   private sentKeys = new Set<string>();
   private lastNoActiveLogAt = 0;
-  private senderTotals = new Map<number, number>();
+  private senderTotals = new Map<string, number>();
 
   constructor(
     private provider: MessageProvider,
@@ -35,7 +35,7 @@ export class CampaignManager {
     private messageRepository: MessageRepository,
     private campaignRepository: CampaignRepository,
     private logger: Logger,
-    private workerId: number,
+    private workerId: string,
     private sendLogRepository: SendLogRepository
   ) {}
 
@@ -120,7 +120,7 @@ export class CampaignManager {
       this.logger.info(
         `delay range: ${delayRange.min}-${delayRange.max}ms`
       );
-      const perSenderCount = new Map<number, number>();
+      const perSenderCount = new Map<string, number>();
       for (const message of batch) {
         const sender = pickSenderBalanced(
           senders,
@@ -225,7 +225,7 @@ export class CampaignManager {
   }
 
   private async sendWithSender(
-    senderId: number,
+    senderId: string,
     message: MessageRow
   ): Promise<{ sent: boolean; avoidCooldown: boolean }> {
     try {
@@ -339,7 +339,7 @@ export class CampaignManager {
     }
   }
 
-  private async completeCampaign(campaignId: number): Promise<void> {
+  private async completeCampaign(campaignId: string): Promise<void> {
     const remaining = await this.messageRepository.countQueuedByCampaign(
       campaignId
     );
@@ -382,12 +382,12 @@ export class CampaignManager {
 }
 
 function pickSenderBalanced(
-  senders: { id: number }[],
-  perSenderCount: Map<number, number>,
-  senderTotals: Map<number, number>,
+  senders: { id: string }[],
+  perSenderCount: Map<string, number>,
+  senderTotals: Map<string, number>,
   maxPerSender: number,
   startIndex: number
-): { id: number } | null {
+): { id: string } | null {
   if (!senders.length) {
     return null;
   }
@@ -399,6 +399,9 @@ function pickSenderBalanced(
   for (let offset = 0; offset < ordered.length; offset += 1) {
     const index = (startIndex + offset) % ordered.length;
     const sender = ordered[index];
+    if (!sender) {
+      continue;
+    }
     const current = perSenderCount.get(sender.id) ?? 0;
     if (current < maxPerSender) {
       perSenderCount.set(sender.id, current + 1);

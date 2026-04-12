@@ -1,7 +1,7 @@
 import type { WorkerStatus, WorkerType } from "../enums";
 
 export class WorkerEntity {
-  id: number;
+  id: string;
   workerName: string;
   workerType: WorkerType;
   status: WorkerStatus;
@@ -9,7 +9,7 @@ export class WorkerEntity {
   startedAt: Date | null;
 
   constructor(params: {
-    id: number;
+    id: string;
     workerName: string;
     workerType: WorkerType;
     status: WorkerStatus;
@@ -25,7 +25,7 @@ export class WorkerEntity {
   }
 
   static fromRow(row: {
-    id: number;
+    id: string;
     worker_name: string;
     worker_type: string;
     status: string;
