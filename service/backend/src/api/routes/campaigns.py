@@ -10,7 +10,9 @@ from src.application.usecases.campaign_usecases import (
     retry_campaign,
     update_campaign,
 )
-from fastapi import APIRouter, Depends, File, Form, UploadFile, status
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from uuid import UUID
 from src.api.schemas.campaigns import (
     CampaignRead,
@@ -88,8 +90,21 @@ def get_metrics(
     campaign_id: UUID,
     db: Session = Depends(get_db),
     _: object = Depends(require_permission(PERM_CAMPAIGN_READ)),
+    created_from: datetime | None = Query(default=None),
+    created_to: datetime | None = Query(default=None),
+    sent_from: datetime | None = Query(default=None),
+    sent_to: datetime | None = Query(default=None),
+    include_no_wa: bool = Query(default=True),
 ):
-    return get_campaign_metrics(campaign_id, db)
+    return get_campaign_metrics(
+        campaign_id,
+        db,
+        created_from=created_from,
+        created_to=created_to,
+        sent_from=sent_from,
+        sent_to=sent_to,
+        include_no_wa=include_no_wa,
+    )
 
 
 @router.patch("/{campaign_id}", response_model=CampaignRead)

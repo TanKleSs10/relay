@@ -233,22 +233,40 @@ def retry_campaign(campaign_id: UUID, db: Session) -> dict[str, int]:
         raise exc
 
 
-def get_campaign_metrics(campaign_id: UUID, db: Session) -> dict[str, int | float]:
+def get_campaign_metrics(
+    campaign_id: UUID,
+    db: Session,
+    created_from: datetime | None = None,
+    created_to: datetime | None = None,
+    sent_from: datetime | None = None,
+    sent_to: datetime | None = None,
+    include_no_wa: bool = True,
+) -> dict[str, int | float]:
     campaign = get_campaign_by_id(db, campaign_id)
     if not campaign:
         raise NotFoundError("Campaign not found")
-    counts = dict(
+    query = (
         db.query(Message.status, func.count(Message.id))
         .filter(Message.campaign_id == campaign_id)
-        .group_by(Message.status)
-        .all()
     )
+    if created_from:
+        query = query.filter(Message.created_at >= created_from)
+    if created_to:
+        query = query.filter(Message.created_at <= created_to)
+    if sent_from:
+        query = query.filter(Message.sent_at >= sent_from)
+    if sent_to:
+        query = query.filter(Message.sent_at <= sent_to)
+    if not include_no_wa:
+        query = query.filter(Message.status != MessageStatus.NO_WA)
+
+    counts = dict(query.group_by(Message.status).all())
     total = sum(counts.values()) if counts else 0
     sent = counts.get(MessageStatus.SENT, 0)
     failed = counts.get(MessageStatus.FAILED, 0)
     pending = counts.get(MessageStatus.PENDING, 0)
     processing = counts.get(MessageStatus.PROCESSING, 0)
-    no_wa = counts.get(MessageStatus.NO_WA, 0)
+    no_wa = counts.get(MessageStatus.NO_WA, 0) if include_no_wa else 0
     effectiveness = (sent / total) if total else 0.0
     return {
         "campaign_id": campaign_id,
