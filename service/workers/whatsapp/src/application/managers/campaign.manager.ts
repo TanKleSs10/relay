@@ -14,7 +14,8 @@ const MAX_MESSAGES_PER_TICK = 12;
 const MAX_PER_SENDER_PER_TICK = 1;
 const LOW_QUEUE_THRESHOLD = 50;
 const FAST_DELAY_RANGE = { min: 150, max: 400 };
-const SLOW_DELAY_RANGE = { min: 400, max: 900 };
+const MEDIUM_DELAY_RANGE = { min: 300, max: 700 };
+const SLOW_DELAY_RANGE = { min: 500, max: 1200 };
 const MAX_CONSECUTIVE_FAILURES = 3;
 const MAX_INIT_RETRIES = 3;
 const PROCESSING_LOCK_WINDOW_MIN = 5;
@@ -102,10 +103,11 @@ export class CampaignManager {
       this.logger.info(
         `limits: max_per_tick=${MAX_MESSAGES_PER_TICK}, max_per_sender=${MAX_PER_SENDER_PER_TICK}, senders_ready=${senders.length}, queued_batch=${batch.length}`
       );
-      const delayRange =
-        batch.length <= LOW_QUEUE_THRESHOLD
-          ? FAST_DELAY_RANGE
-          : SLOW_DELAY_RANGE;
+      const delayRange = pickDelayRange(
+        batch.length,
+        senders.length,
+        LOW_QUEUE_THRESHOLD
+      );
       this.logger.info(
         `delay range: ${delayRange.min}-${delayRange.max}ms`
       );
@@ -187,14 +189,14 @@ export class CampaignManager {
           const streak = (this.failureStreaks.get(sender.id) ?? 0) + 1;
           this.failureStreaks.set(sender.id, streak);
           if (streak >= MAX_CONSECUTIVE_FAILURES) {
-            this.logger.warn(
-              `sender ${sender.id} entered COOLDOWN after ${streak} failures`
+          this.logger.warn(
+            `sender ${sender.id} entered COOLDOWN after ${streak} failures`
+          );
+          try {
+            await this.senderRepository.updateStatus(
+              sender.id,
+              SenderAccountStatus.COOLDOWN
             );
-            try {
-              await this.senderRepository.updateStatus(
-                sender.id,
-                SenderAccountStatus.COOLDOWN
-              );
             } catch (error) {
               this.logger.error(
                 `failed to set COOLDOWN for sender ${sender.id}`,
@@ -417,4 +419,18 @@ function isNoWaRecipient(error: string): boolean {
     error.includes("wid error") ||
     error.includes("jid error")
   );
+}
+
+function pickDelayRange(
+  batchSize: number,
+  senderCount: number,
+  lowQueueThreshold: number
+): { min: number; max: number } {
+  if (batchSize <= lowQueueThreshold && senderCount >= 3) {
+    return FAST_DELAY_RANGE;
+  }
+  if (senderCount <= 1) {
+    return SLOW_DELAY_RANGE;
+  }
+  return MEDIUM_DELAY_RANGE;
 }
