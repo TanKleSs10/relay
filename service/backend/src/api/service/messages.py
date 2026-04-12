@@ -1,20 +1,19 @@
 from __future__ import annotations
-
 import hashlib
 import re
-
 from sqlalchemy.orm import Session
 from uuid import UUID
-
 from src.application.errors import ConflictError
 from src.domain import Campaign, Message, MessageStatus
 from src.infrastructure.machine.message_machine import can_transition
+
 
 def create_messages(
     db: Session,
     recipient: str,
     content: str,
     campaign_id: UUID,
+    external_id: str | None = None,
     allow_duplicate: bool = False,
 ) -> Message | None:
     normalized_recipient = normalize_mx_recipient(recipient)
@@ -36,6 +35,7 @@ def create_messages(
         recipient=normalized_recipient,
         content=content,
         campaign_id=campaign_id,
+        external_id=external_id,
         idempotency_key=idempotency_key,
         status=MessageStatus.PENDING,
     )
@@ -62,12 +62,7 @@ def list_messages_filtered(
         query = query.filter(Message.campaign_id == campaign_id)
     if status is not None:
         query = query.filter(Message.status == status)
-    return (
-        query.order_by(Message.id.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+    return query.order_by(Message.id.desc()).offset(skip).limit(limit).all()
 
 
 def count_messages_filtered(
@@ -105,7 +100,11 @@ def update_message_error(
 def update_message(
     db: Session, message: Message, recipient: str | None, payload: str | None
 ) -> Message:
-    next_recipient = normalize_mx_recipient(recipient) if recipient is not None else message.recipient
+    next_recipient = (
+        normalize_mx_recipient(recipient)
+        if recipient is not None
+        else message.recipient
+    )
     next_content = payload if payload is not None else message.content
 
     if next_recipient != message.recipient or next_content != message.content:

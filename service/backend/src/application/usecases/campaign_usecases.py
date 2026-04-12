@@ -26,12 +26,16 @@ def _ensure_unique_campaign_name(db: Session, name: str) -> None:
         raise ConflictError("Campaign with this name already exists")
 
 
-def _extract_message_row(row: dict[str, str]) -> tuple[str | None, str | None]:
+def _extract_message_row(
+    row: dict[str, str],
+) -> tuple[str | None, str | None, str | None]:
     recipient = row.get("phone") or row.get("recipient") or row.get("phone_number")
     content = row.get("message") or row.get("payload") or row.get("text")
+    external_id = row.get("external_id") or row.get("credit_id") or row.get("id")
     recipient_str = recipient if isinstance(recipient, str) else None
     content_str = content if isinstance(content, str) else None
-    return recipient_str, content_str
+    external_id_str = external_id if isinstance(external_id, str) else None
+    return recipient_str, content_str, external_id_str
 
 
 def create_campaign_with_file(name: str, file: UploadFile | None, db: Session):
@@ -56,7 +60,7 @@ def create_campaign_with_file(name: str, file: UploadFile | None, db: Session):
         invalid_rows: list[dict[str, object]] = []
 
         for idx, row in enumerate(data, start=1):
-            recipient, content = _extract_message_row(row)
+            recipient, content, external_id = _extract_message_row(row)
 
             if not recipient or not content:
                 invalid_rows.append({"row": idx, "data": row})
@@ -67,6 +71,7 @@ def create_campaign_with_file(name: str, file: UploadFile | None, db: Session):
                 recipient=recipient,
                 content=content,
                 campaign_id=campaign.id,
+                external_id=external_id,
                 allow_duplicate=True,
             )
             if message:

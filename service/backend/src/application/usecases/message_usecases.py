@@ -1,8 +1,6 @@
 from __future__ import annotations
-
 from sqlalchemy.orm import Session
 from uuid import UUID
-
 from src.api.schemas.messages import MessageCreate, MessageUpdate
 from src.application.errors import NotFoundError
 from src.api.service.campaigns import get_campaign_by_id
@@ -28,9 +26,15 @@ def create_message(db: Session, payload: MessageCreate) -> Message:
             recipient=payload.recipient,
             content=payload.content,
             campaign_id=payload.campaign_id,
+            external_id=payload.external_id,
         )
+
+        if not message:
+            raise Exception("Failed to create message")
+
         db.commit()
         db.refresh(message)
+
         return message
     except Exception as exc:
         db.rollback()
@@ -75,7 +79,9 @@ def remove_message(message_id: UUID, db: Session):
         raise exc
 
 
-def update_message_item(message_id: UUID, payload: MessageUpdate, db: Session) -> Message:
+def update_message_item(
+    message_id: UUID, payload: MessageUpdate, db: Session
+) -> Message:
     message = get_message_by_id(db, message_id)
     if not message:
         raise NotFoundError("Message not found")
