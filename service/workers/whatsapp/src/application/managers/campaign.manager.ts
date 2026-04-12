@@ -26,6 +26,7 @@ export class CampaignManager {
   private roundRobinIndex = 0;
   private sentKeys = new Set<string>();
   private lastNoActiveLogAt = 0;
+  private senderTotals = new Map<number, number>();
 
   constructor(
     private provider: MessageProvider,
@@ -63,6 +64,7 @@ export class CampaignManager {
         this.cachedQueue = [];
         this.roundRobinIndex = 0;
         this.sentKeys.clear();
+        this.senderTotals.clear();
       }
 
       const senders = await this.senderRepository.listByStatus(
@@ -109,9 +111,10 @@ export class CampaignManager {
       );
       const perSenderCount = new Map<number, number>();
       for (const message of batch) {
-        const sender = pickSender(
+        const sender = pickSenderBalanced(
           senders,
           perSenderCount,
+          this.senderTotals,
           MAX_PER_SENDER_PER_TICK,
           this.roundRobinIndex
         );
@@ -121,6 +124,10 @@ export class CampaignManager {
         }
         this.roundRobinIndex =
           (this.roundRobinIndex + 1) % Math.max(1, senders.length);
+        this.senderTotals.set(
+          sender.id,
+          (this.senderTotals.get(sender.id) ?? 0) + 1
+        );
         const normalizedRecipient = normalizeRecipientForDedup(message.recipient);
         const dedupeKey = message.idempotency_key ?? normalizedRecipient;
         if (this.sentKeys.has(dedupeKey)) {
@@ -361,18 +368,24 @@ export class CampaignManager {
   }
 }
 
-function pickSender(
+function pickSenderBalanced(
   senders: { id: number }[],
   perSenderCount: Map<number, number>,
+  senderTotals: Map<number, number>,
   maxPerSender: number,
   startIndex: number
 ): { id: number } | null {
   if (!senders.length) {
     return null;
   }
-  for (let offset = 0; offset < senders.length; offset += 1) {
-    const index = (startIndex + offset) % senders.length;
-    const sender = senders[index];
+  const ordered = [...senders].sort((a, b) => {
+    const aTotal = senderTotals.get(a.id) ?? 0;
+    const bTotal = senderTotals.get(b.id) ?? 0;
+    return aTotal - bTotal;
+  });
+  for (let offset = 0; offset < ordered.length; offset += 1) {
+    const index = (startIndex + offset) % ordered.length;
+    const sender = ordered[index];
     const current = perSenderCount.get(sender.id) ?? 0;
     if (current < maxPerSender) {
       perSenderCount.set(sender.id, current + 1);
