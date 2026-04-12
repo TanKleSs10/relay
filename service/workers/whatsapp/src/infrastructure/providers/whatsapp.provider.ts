@@ -61,10 +61,12 @@ export class WhatsAppProvider implements MessageProvider {
       console.warn(`Provider disconnected for sender ${senderId}: ${reason}`);
       entry.initializing = false;
       entry.onDisconnect?.();
+      void this.clear(senderId);
     });
     client.on("auth_failure", (message: string) => {
       console.error(`Provider auth failure for sender ${senderId}: ${message}`);
       entry.initializing = false;
+      void this.clear(senderId);
     });
     client.on("authenticated", () => {
       console.log(`Provider authenticated event for sender ${senderId}`);
