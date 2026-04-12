@@ -6,6 +6,7 @@ from src.api.routes.deps import get_db
 from src.api.schemas.sender_accounts import (
     SenderAccountCreate,
     SenderAccountRead,
+    SenderAccountUpdate,
 )
 from src.api.schemas.sender_sessions import (
     SenderSessionRead,
@@ -18,6 +19,7 @@ from src.application.usecases.sender_account_usecases import (
     list_senders as list_senders_usecase,
     remove_sender as remove_sender_usecase,
     reset_sender as reset_sender_usecase,
+    update_sender as update_sender_usecase,
 )
 from src.api.service.sender_sessions import get_sender_session, list_session_logs
 from src.security.auth import require_permission
@@ -71,6 +73,16 @@ def delete_item(
 ):
     remove_sender_usecase(sender_id, db)
     return None
+
+
+@router.patch("/{sender_id}", response_model=SenderAccountRead)
+def update_item(
+    sender_id: UUID,
+    payload: SenderAccountUpdate,
+    db: Session = Depends(get_db),
+    _: object = Depends(require_permission(PERM_SENDER_MANAGE)),
+):
+    return update_sender_usecase(sender_id, payload, db)
 
 
 @router.post("/{sender_id}/reset-session", response_model=SenderAccountRead)

@@ -19,6 +19,7 @@ class SenderAccountCreate(SenderAccountBase):
 
 
 class SenderAccountUpdate(APIModel):
+    label: str | None = Field(default=None, min_length=1, max_length=150)
     status: SenderAccountStatus | None = None
     cooldown_until: datetime | None = None
     last_sent_at: datetime | None = None
