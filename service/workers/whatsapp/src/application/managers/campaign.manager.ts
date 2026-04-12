@@ -14,17 +14,20 @@ const MAX_MESSAGES_PER_TICK = 12;
 const MAX_PER_SENDER_PER_TICK = 1;
 const LOW_QUEUE_THRESHOLD = 50;
 const FAST_DELAY_RANGE = { min: 150, max: 400 };
-const SLOW_DELAY_RANGE = { min: 400, max: 900 };
+const MEDIUM_DELAY_RANGE = { min: 300, max: 700 };
+const SLOW_DELAY_RANGE = { min: 500, max: 1200 };
 const MAX_CONSECUTIVE_FAILURES = 3;
 const MAX_INIT_RETRIES = 3;
+const PROCESSING_LOCK_WINDOW_MIN = 5;
 
 export class CampaignManager {
-  private failureStreaks = new Map<number, number>();
-  private cachedCampaignId: number | null = null;
+  private failureStreaks = new Map<string, number>();
+  private cachedCampaignId: string | null = null;
   private cachedQueue: MessageRow[] = [];
   private roundRobinIndex = 0;
   private sentKeys = new Set<string>();
   private lastNoActiveLogAt = 0;
+  private senderTotals = new Map<string, number>();
 
   constructor(
     private provider: MessageProvider,
@@ -32,7 +35,7 @@ export class CampaignManager {
     private messageRepository: MessageRepository,
     private campaignRepository: CampaignRepository,
     private logger: Logger,
-    private workerId: number,
+    private workerId: string,
     private sendLogRepository: SendLogRepository
   ) {}
 
@@ -62,6 +65,7 @@ export class CampaignManager {
         this.cachedQueue = [];
         this.roundRobinIndex = 0;
         this.sentKeys.clear();
+        this.senderTotals.clear();
       }
 
       const senders = await this.senderRepository.listByStatus(
@@ -73,6 +77,15 @@ export class CampaignManager {
         );
         return;
       }
+      const queuedCount = await this.messageRepository.countQueuedByCampaign(
+        campaignId
+      );
+      const processingCount = await this.messageRepository.countProcessingByCampaign(
+        campaignId
+      );
+      this.logger.info(
+        `campaign ${campaignId} state: queued=${queuedCount}, processing=${processingCount}, senders_ready=${senders.length}`
+      );
 
       if (this.cachedQueue.length === 0) {
         this.cachedQueue = await this.messageRepository.claimNextBatch(
@@ -99,18 +112,20 @@ export class CampaignManager {
       this.logger.info(
         `limits: max_per_tick=${MAX_MESSAGES_PER_TICK}, max_per_sender=${MAX_PER_SENDER_PER_TICK}, senders_ready=${senders.length}, queued_batch=${batch.length}`
       );
-      const delayRange =
-        batch.length <= LOW_QUEUE_THRESHOLD
-          ? FAST_DELAY_RANGE
-          : SLOW_DELAY_RANGE;
+      const delayRange = pickDelayRange(
+        batch.length,
+        senders.length,
+        LOW_QUEUE_THRESHOLD
+      );
       this.logger.info(
         `delay range: ${delayRange.min}-${delayRange.max}ms`
       );
-      const perSenderCount = new Map<number, number>();
+      const perSenderCount = new Map<string, number>();
       for (const message of batch) {
-        const sender = pickSender(
+        const sender = pickSenderBalanced(
           senders,
           perSenderCount,
+          this.senderTotals,
           MAX_PER_SENDER_PER_TICK,
           this.roundRobinIndex
         );
@@ -120,6 +135,10 @@ export class CampaignManager {
         }
         this.roundRobinIndex =
           (this.roundRobinIndex + 1) % Math.max(1, senders.length);
+        this.senderTotals.set(
+          sender.id,
+          (this.senderTotals.get(sender.id) ?? 0) + 1
+        );
         const normalizedRecipient = normalizeRecipientForDedup(message.recipient);
         const dedupeKey = message.idempotency_key ?? normalizedRecipient;
         if (this.sentKeys.has(dedupeKey)) {
@@ -130,6 +149,7 @@ export class CampaignManager {
           );
           await this.sendLogRepository.create({
             messageId: message.id,
+            campaignId: message.campaign_id,
             senderId: sender.id,
             workerId: this.workerId,
             status: "FAILED",
@@ -157,6 +177,7 @@ export class CampaignManager {
           );
           await this.sendLogRepository.create({
             messageId: message.id,
+            campaignId: message.campaign_id,
             senderId: sender.id,
             workerId: this.workerId,
             status: "FAILED",
@@ -180,7 +201,9 @@ export class CampaignManager {
           this.failureStreaks.set(sender.id, streak);
           if (streak >= MAX_CONSECUTIVE_FAILURES) {
             this.logger.warn(
-              `sender ${sender.id} entered COOLDOWN after ${streak} failures`
+              `sender ${sender.id} entered COOLDOWN after ${streak} failures (total_sent=${this.senderTotals.get(
+                sender.id
+              ) ?? 0})`
             );
             try {
               await this.senderRepository.updateStatus(
@@ -204,7 +227,7 @@ export class CampaignManager {
   }
 
   private async sendWithSender(
-    senderId: number,
+    senderId: string,
     message: MessageRow
   ): Promise<{ sent: boolean; avoidCooldown: boolean }> {
     try {
@@ -219,6 +242,7 @@ export class CampaignManager {
         await this.messageRepository.markSent(message.id, senderId);
         await this.sendLogRepository.create({
           messageId: message.id,
+          campaignId: message.campaign_id,
           senderId,
           workerId: this.workerId,
           status: "SENT",
@@ -233,6 +257,7 @@ export class CampaignManager {
       await this.messageRepository.markSent(message.id, senderId);
       await this.sendLogRepository.create({
         messageId: message.id,
+        campaignId: message.campaign_id,
         senderId,
         workerId: this.workerId,
         status: "SENT",
@@ -249,6 +274,7 @@ export class CampaignManager {
         await this.messageRepository.markFailed(message.id, note, senderId);
         await this.sendLogRepository.create({
           messageId: message.id,
+          campaignId: message.campaign_id,
           senderId,
           workerId: this.workerId,
           status: "FAILED",
@@ -261,6 +287,7 @@ export class CampaignManager {
         await this.messageRepository.markNoWa(message.id, senderId);
         await this.sendLogRepository.create({
           messageId: message.id,
+          campaignId: message.campaign_id,
           senderId,
           workerId: this.workerId,
           status: "NO_WA",
@@ -318,7 +345,7 @@ export class CampaignManager {
     }
   }
 
-  private async completeCampaign(campaignId: number): Promise<void> {
+  private async completeCampaign(campaignId: string): Promise<void> {
     const remaining = await this.messageRepository.countQueuedByCampaign(
       campaignId
     );
@@ -327,6 +354,24 @@ export class CampaignManager {
         `campaign ${campaignId} still has ${remaining} queued messages`
       );
       return;
+    }
+    const processing = await this.messageRepository.countProcessingByCampaign(
+      campaignId
+    );
+    if (processing > 0) {
+      const recentLocks = await this.messageRepository.countRecentLocksByCampaign(
+        campaignId,
+        PROCESSING_LOCK_WINDOW_MIN
+      );
+      if (recentLocks > 0) {
+        this.logger.info(
+          `campaign ${campaignId} still has ${processing} processing messages`
+        );
+        return;
+      }
+      this.logger.warn(
+        `campaign ${campaignId} has ${processing} stale processing messages`
+      );
     }
     const failed = await this.messageRepository.countFailedByCampaign(campaignId);
     if (failed > 0) {
@@ -342,18 +387,27 @@ export class CampaignManager {
   }
 }
 
-function pickSender(
-  senders: { id: number }[],
-  perSenderCount: Map<number, number>,
+function pickSenderBalanced(
+  senders: { id: string }[],
+  perSenderCount: Map<string, number>,
+  senderTotals: Map<string, number>,
   maxPerSender: number,
   startIndex: number
-): { id: number } | null {
+): { id: string } | null {
   if (!senders.length) {
     return null;
   }
-  for (let offset = 0; offset < senders.length; offset += 1) {
-    const index = (startIndex + offset) % senders.length;
-    const sender = senders[index];
+  const ordered = [...senders].sort((a, b) => {
+    const aTotal = senderTotals.get(a.id) ?? 0;
+    const bTotal = senderTotals.get(b.id) ?? 0;
+    return aTotal - bTotal;
+  });
+  for (let offset = 0; offset < ordered.length; offset += 1) {
+    const index = (startIndex + offset) % ordered.length;
+    const sender = ordered[index];
+    if (!sender) {
+      continue;
+    }
     const current = perSenderCount.get(sender.id) ?? 0;
     if (current < maxPerSender) {
       perSenderCount.set(sender.id, current + 1);
@@ -385,4 +439,18 @@ function isNoWaRecipient(error: string): boolean {
     error.includes("wid error") ||
     error.includes("jid error")
   );
+}
+
+function pickDelayRange(
+  batchSize: number,
+  senderCount: number,
+  lowQueueThreshold: number
+): { min: number; max: number } {
+  if (batchSize <= lowQueueThreshold && senderCount >= 3) {
+    return FAST_DELAY_RANGE;
+  }
+  if (senderCount <= 1) {
+    return SLOW_DELAY_RANGE;
+  }
+  return MEDIUM_DELAY_RANGE;
 }

@@ -2,6 +2,7 @@ import { CampaignWorker } from "./application/workers/campaign.worker";
 import { QrWorker } from "./application/workers/qr.worker";
 import { SessionWorker } from "./application/workers/session.worker";
 import { RecoveryWorker } from "./application/workers/recovery.worker";
+import { WorkerHeartbeatWorker } from "./application/workers/worker-heartbeat.worker";
 import { RecoveryManager } from "./application/managers/recovery.manager";
 import { CampaignManager } from "./application/managers/campaign.manager";
 import { QrManager } from "./application/managers/qr.manager";
@@ -21,6 +22,7 @@ const QR_INTERVAL_MS = 2000;
 const SESSION_INTERVAL_MS = 5000;
 const CAMPAIGN_INTERVAL_MS = 2000;
 const RECOVERY_INTERVAL_MS = 10000;
+const WORKER_HEARTBEAT_MS = 5000;
 
 async function bootstrap() {
   const logger = createLogger("Bootstrap");
@@ -74,11 +76,18 @@ async function bootstrap() {
     RECOVERY_INTERVAL_MS,
     createLogger("RecoveryWorker")
   );
+  const heartbeatWorker = new WorkerHeartbeatWorker(
+    workerManager,
+    worker.id,
+    WORKER_HEARTBEAT_MS,
+    createLogger("WorkerHeartbeat")
+  );
 
   void qrWorker.start();
   void sessionWorker.start();
   void campaignWorker.start();
   void recoveryWorker.start();
+  void heartbeatWorker.start();
 }
 
 bootstrap().catch((error) => {

@@ -3,12 +3,13 @@ import type { Pool } from "pg";
 import { MessageStatus } from "../../domain/enums";
 
 export type MessageRow = {
-  id: number;
-  campaign_id: number;
+  id: string;
+  campaign_id: string;
   recipient: string;
   content: string;
   status: string;
   idempotency_key?: string | null;
+  retry_count?: number | null;
 };
 
 export class MessageRepository {
@@ -19,8 +20,8 @@ export class MessageRepository {
   }
 
   async claimNextBatch(
-    campaignId: number,
-    workerId: number,
+    campaignId: string,
+    workerId: string,
     limit: number
   ): Promise<MessageRow[]> {
     const result = await this.pool.query<MessageRow>(
@@ -36,16 +37,16 @@ export class MessageRepository {
        UPDATE messages
        SET status = $4,
            locked_at = NOW(),
-           processing_by_worker = $5
+           processing_by_worker_id = $5
        WHERE id IN (SELECT id FROM candidates)
-       RETURNING id, campaign_id, recipient, content, status, idempotency_key`,
+       RETURNING id, campaign_id, recipient, content, status, idempotency_key, retry_count`,
       [campaignId, MessageStatus.PENDING, limit, MessageStatus.PROCESSING, workerId]
     );
     return result.rows;
   }
 
   async listQueuedByCampaign(
-    campaignId: number,
+    campaignId: string,
     limit: number
   ): Promise<MessageRow[]> {
     const result = await this.pool.query<MessageRow>(
@@ -57,13 +58,13 @@ export class MessageRepository {
 
   async releaseStaleLocks(maxAgeMinutes: number): Promise<number> {
     const result = await this.pool.query<{ count: string }>(
-      "UPDATE messages SET status = $2, locked_at = NULL, processing_by_worker = NULL, processing_sender_id = NULL WHERE status = $1 AND locked_at IS NOT NULL AND locked_at < NOW() - ($3 || ' minutes')::interval RETURNING id",
+      "UPDATE messages SET status = $2, locked_at = NULL, processing_by_worker_id = NULL, processing_sender_id = NULL WHERE status = $1 AND locked_at IS NOT NULL AND locked_at < NOW() - ($3 || ' minutes')::interval RETURNING id",
       [MessageStatus.PROCESSING, MessageStatus.PENDING, maxAgeMinutes]
     );
     return result.rowCount ?? 0;
   }
 
-  async countQueuedByCampaign(campaignId: number): Promise<number> {
+  async countQueuedByCampaign(campaignId: string): Promise<number> {
     const result = await this.pool.query<{ count: string }>(
       "SELECT COUNT(*) AS count FROM messages WHERE campaign_id = $1 AND status = $2",
       [campaignId, MessageStatus.PENDING]
@@ -71,7 +72,7 @@ export class MessageRepository {
     return Number(result.rows[0]?.count ?? 0);
   }
 
-  async countFailedByCampaign(campaignId: number): Promise<number> {
+  async countFailedByCampaign(campaignId: string): Promise<number> {
     const result = await this.pool.query<{ count: string }>(
       "SELECT COUNT(*) AS count FROM messages WHERE campaign_id = $1 AND status = $2",
       [campaignId, MessageStatus.FAILED]
@@ -79,8 +80,27 @@ export class MessageRepository {
     return Number(result.rows[0]?.count ?? 0);
   }
 
+  async countProcessingByCampaign(campaignId: string): Promise<number> {
+    const result = await this.pool.query<{ count: string }>(
+      "SELECT COUNT(*) AS count FROM messages WHERE campaign_id = $1 AND status = $2",
+      [campaignId, MessageStatus.PROCESSING]
+    );
+    return Number(result.rows[0]?.count ?? 0);
+  }
+
+  async countRecentLocksByCampaign(
+    campaignId: string,
+    maxAgeMinutes: number
+  ): Promise<number> {
+    const result = await this.pool.query<{ count: string }>(
+      "SELECT COUNT(*) AS count FROM messages WHERE campaign_id = $1 AND status = $2 AND locked_at IS NOT NULL AND locked_at >= NOW() - ($3 || ' minutes')::interval",
+      [campaignId, MessageStatus.PROCESSING, maxAgeMinutes]
+    );
+    return Number(result.rows[0]?.count ?? 0);
+  }
+
   async hasSentIdempotency(
-    campaignId: number,
+    campaignId: string,
     idempotencyKey: string | null,
     recipient: string
   ): Promise<boolean> {
@@ -98,7 +118,7 @@ export class MessageRepository {
     return result.rows[0]?.exists ?? false;
   }
 
-  async markSent(messageId: number, senderId: number): Promise<void> {
+  async markSent(messageId: string, senderId: string): Promise<void> {
     await this.pool.query(
       "UPDATE messages SET status = $2, sent_at = NOW(), processing_sender_id = $3 WHERE id = $1",
       [messageId, MessageStatus.SENT, senderId]
@@ -106,9 +126,9 @@ export class MessageRepository {
   }
 
   async markFailed(
-    messageId: number,
+    messageId: string,
     error: string,
-    senderId: number | null
+    senderId: string | null
   ): Promise<void> {
     await this.pool.query(
       "UPDATE messages SET status = $2, retry_count = retry_count + 1, processing_sender_id = $3 WHERE id = $1",
@@ -117,8 +137,8 @@ export class MessageRepository {
   }
 
   async markNoWa(
-    messageId: number,
-    senderId: number | null
+    messageId: string,
+    senderId: string | null
   ): Promise<void> {
     await this.pool.query(
       "UPDATE messages SET status = $2, processing_sender_id = $3 WHERE id = $1",
@@ -126,9 +146,9 @@ export class MessageRepository {
     );
   }
 
-  async markPending(messageId: number): Promise<void> {
+  async markPending(messageId: string): Promise<void> {
     await this.pool.query(
-      "UPDATE messages SET status = $2, locked_at = NULL, processing_by_worker = NULL, processing_sender_id = NULL WHERE id = $1",
+      "UPDATE messages SET status = $2, locked_at = NULL, processing_by_worker_id = NULL, processing_sender_id = NULL WHERE id = $1",
       [messageId, MessageStatus.PENDING]
     );
   }

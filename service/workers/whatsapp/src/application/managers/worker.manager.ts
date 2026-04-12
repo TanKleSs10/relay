@@ -22,4 +22,12 @@ export class WorkerManager {
     this.logger.info(`worker ${workerName} created`);
     return created;
   }
+
+  async heartbeat(workerId: string): Promise<void> {
+    try {
+      await this.repository.updateStatus(workerId, WorkerStatus.ONLINE);
+    } catch (error) {
+      this.logger.error(`heartbeat failed for worker ${workerId}`, error);
+    }
+  }
 }

@@ -11,9 +11,22 @@ export class SenderRepository implements SenderRepositoryPort {
     this.pool = pool;
   }
 
-  async findById(senderId: number): Promise<SenderEntity | null> {
+  async findById(senderId: string): Promise<SenderEntity | null> {
     const result = await this.pool.query(
-      "SELECT id, phone_number, status, qr_code, qr_generated_at, session_path, cooldown_until, last_sent_at, created_at, updated_at FROM sender_accounts WHERE id = $1 LIMIT 1",
+      `SELECT sa.id,
+              sa.phone_number,
+              sa.status,
+              ss.qr_code,
+              ss.qr_generated_at,
+              sa.cooldown_until,
+              sa.last_sent_at,
+              sa.last_seen_at,
+              sa.created_at,
+              sa.updated_at
+       FROM sender_accounts sa
+       LEFT JOIN sender_sessions ss ON ss.sender_account_id = sa.id
+       WHERE sa.id = $1
+       LIMIT 1`,
       [senderId]
     );
     const row = result.rows[0];
@@ -22,7 +35,20 @@ export class SenderRepository implements SenderRepositoryPort {
 
   async listByStatus(status: SenderAccountStatus): Promise<SenderEntity[]> {
     const result = await this.pool.query(
-      "SELECT id, phone_number, status, qr_code, qr_generated_at, session_path, cooldown_until, last_sent_at, created_at, updated_at FROM sender_accounts WHERE status = $1 ORDER BY id DESC",
+      `SELECT sa.id,
+              sa.phone_number,
+              sa.status,
+              ss.qr_code,
+              ss.qr_generated_at,
+              sa.cooldown_until,
+              sa.last_sent_at,
+              sa.last_seen_at,
+              sa.created_at,
+              sa.updated_at
+       FROM sender_accounts sa
+       LEFT JOIN sender_sessions ss ON ss.sender_account_id = sa.id
+       WHERE sa.status = $1
+       ORDER BY sa.id DESC`,
       [status]
     );
     return result.rows.map((row) => SenderEntity.fromRow(row));
@@ -30,7 +56,21 @@ export class SenderRepository implements SenderRepositoryPort {
 
   async listQrRequiredWithoutCode(): Promise<SenderEntity[]> {
     const result = await this.pool.query(
-      "SELECT id, phone_number, status, qr_code, qr_generated_at, session_path, cooldown_until, last_sent_at, created_at, updated_at FROM sender_accounts WHERE status = ANY($1) AND qr_code IS NULL ORDER BY id DESC",
+      `SELECT sa.id,
+              sa.phone_number,
+              sa.status,
+              ss.qr_code,
+              ss.qr_generated_at,
+              sa.cooldown_until,
+              sa.last_sent_at,
+              sa.last_seen_at,
+              sa.created_at,
+              sa.updated_at
+       FROM sender_accounts sa
+       LEFT JOIN sender_sessions ss ON ss.sender_account_id = sa.id
+       WHERE sa.status = ANY($1)
+         AND ss.qr_code IS NULL
+       ORDER BY sa.id DESC`,
       [[
         SenderAccountStatus.CREATED,
         SenderAccountStatus.INITIALIZING,
@@ -42,62 +82,95 @@ export class SenderRepository implements SenderRepositoryPort {
 
   async listAll(): Promise<SenderEntity[]> {
     const result = await this.pool.query(
-      "SELECT id, phone_number, status, qr_code, qr_generated_at, session_path, cooldown_until, last_sent_at, created_at, updated_at FROM sender_accounts ORDER BY id DESC"
+      `SELECT sa.id,
+              sa.phone_number,
+              sa.status,
+              ss.qr_code,
+              ss.qr_generated_at,
+              sa.cooldown_until,
+              sa.last_sent_at,
+              sa.last_seen_at,
+              sa.created_at,
+              sa.updated_at
+       FROM sender_accounts sa
+       LEFT JOIN sender_sessions ss ON ss.sender_account_id = sa.id
+       ORDER BY sa.id DESC`
     );
     return result.rows.map((row) => SenderEntity.fromRow(row));
   }
 
-  async resetSession(senderId: number): Promise<SenderEntity> {
-    const result = await this.pool.query(
-      "UPDATE sender_accounts SET status = $2, phone_number = NULL, qr_code = NULL, qr_generated_at = NULL, updated_at = NOW() WHERE id = $1 RETURNING id, phone_number, status, qr_code, qr_generated_at, session_path, cooldown_until, last_sent_at, created_at, updated_at",
+  async resetSession(senderId: string): Promise<SenderEntity> {
+    await this.pool.query(
+      "UPDATE sender_accounts SET status = $2, phone_number = NULL, updated_at = NOW() WHERE id = $1",
       [senderId, SenderAccountStatus.WAITING_QR]
     );
-    const row = result.rows[0];
+    await this.pool.query(
+      `INSERT INTO sender_sessions (sender_account_id, session_key, qr_code, qr_generated_at)
+       VALUES ($1, $2, NULL, NULL)
+       ON CONFLICT (sender_account_id)
+       DO UPDATE SET qr_code = NULL, qr_generated_at = NULL, updated_at = NOW()`,
+      [senderId, `sender-${senderId}`]
+    );
+    const row = await this.findById(senderId);
     if (!row) {
       throw new Error(`Sender account ${senderId} not found for reset`);
     }
-    return SenderEntity.fromRow(row);
+    return row;
   }
 
   async updateStatus(
-    senderId: number,
+    senderId: string,
     status: SenderAccountStatus
   ): Promise<SenderEntity> {
-    const result = await this.pool.query(
-      "UPDATE sender_accounts SET status = $2, updated_at = NOW() WHERE id = $1 RETURNING id, phone_number, status, qr_code, qr_generated_at, session_path, cooldown_until, last_sent_at, created_at, updated_at",
+    await this.pool.query(
+      "UPDATE sender_accounts SET status = $2, updated_at = NOW() WHERE id = $1",
       [senderId, status]
     );
-    const row = result.rows[0];
+    const row = await this.findById(senderId);
     if (!row) {
       throw new Error(`Sender account ${senderId} not found for status update`);
     }
-    return SenderEntity.fromRow(row);
+    return row;
   }
 
-  async updateQr(senderId: number, qrCode: string): Promise<SenderEntity> {
-    const result = await this.pool.query(
-      "UPDATE sender_accounts SET status = $2, qr_code = $3, qr_generated_at = NOW(), updated_at = NOW() WHERE id = $1 RETURNING id, phone_number, status, qr_code, qr_generated_at, session_path, cooldown_until, last_sent_at, created_at, updated_at",
-      [senderId, SenderAccountStatus.WAITING_QR, qrCode]
+  async updateQr(senderId: string, qrCode: string): Promise<SenderEntity> {
+    await this.pool.query(
+      "UPDATE sender_accounts SET status = $2, updated_at = NOW() WHERE id = $1",
+      [senderId, SenderAccountStatus.WAITING_QR]
     );
-    const row = result.rows[0];
+    await this.pool.query(
+      `INSERT INTO sender_sessions (sender_account_id, session_key, qr_code, qr_generated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (sender_account_id)
+       DO UPDATE SET qr_code = $3, qr_generated_at = NOW(), updated_at = NOW()`,
+      [senderId, `sender-${senderId}`, qrCode]
+    );
+    const row = await this.findById(senderId);
     if (!row) {
       throw new Error(`Sender account ${senderId} not found for QR update`);
     }
-    return SenderEntity.fromRow(row);
+    return row;
   }
 
   async updateReady(
-    senderId: number,
+    senderId: string,
     phoneNumber: string | null
   ): Promise<SenderEntity> {
-    const result = await this.pool.query(
-      "UPDATE sender_accounts SET status = $2, phone_number = $3, qr_code = NULL, updated_at = NOW() WHERE id = $1 RETURNING id, phone_number, status, qr_code, qr_generated_at, session_path, cooldown_until, last_sent_at, created_at, updated_at",
+    await this.pool.query(
+      "UPDATE sender_accounts SET status = $2, phone_number = $3, updated_at = NOW() WHERE id = $1",
       [senderId, SenderAccountStatus.CONNECTED, phoneNumber]
     );
-    const row = result.rows[0];
+    await this.pool.query(
+      `INSERT INTO sender_sessions (sender_account_id, session_key, last_ready_at, qr_code, qr_generated_at)
+       VALUES ($1, $2, NOW(), NULL, NULL)
+       ON CONFLICT (sender_account_id)
+       DO UPDATE SET last_ready_at = NOW(), qr_code = NULL, qr_generated_at = NULL, updated_at = NOW()`,
+      [senderId, `sender-${senderId}`]
+    );
+    const row = await this.findById(senderId);
     if (!row) {
       throw new Error(`Sender account ${senderId} not found for CONNECTED update`);
     }
-    return SenderEntity.fromRow(row);
+    return row;
   }
 }

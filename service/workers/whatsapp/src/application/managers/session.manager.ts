@@ -49,10 +49,12 @@ async function syncSessions(
   for (const sender of senders) {
     if (
       sender.status === SenderAccountStatus.CONNECTED ||
-      sender.status === SenderAccountStatus.DISCONNECTED
+      sender.status === SenderAccountStatus.DISCONNECTED ||
+      sender.status === SenderAccountStatus.SENDING
     ) {
       const state = await provider.getState?.(sender.id);
       if (!state) {
+        logger.warn(`sender ${sender.id} state unknown; skipping transition`);
         continue;
       }
       if (state === "CONNECTED") {
@@ -84,6 +86,10 @@ async function syncSessions(
       }
     }
 
+    if (sender.status === SenderAccountStatus.INITIALIZING) {
+      continue;
+    }
+
     if (sender.status === SenderAccountStatus.DISCONNECTED) {
       logger.info(`sender ${sender.id} reinitializing`);
       await senderRepository.updateStatus(
@@ -101,7 +107,7 @@ async function syncSessions(
   }
 }
 
-async function cleanupAuthState(senderId: number, logger: Logger): Promise<void> {
+async function cleanupAuthState(senderId: string, logger: Logger): Promise<void> {
   const sessionPath = join(AUTH_DATA_PATH, `session-sender-${senderId}`);
   try {
     await rm(sessionPath, { recursive: true, force: true });
