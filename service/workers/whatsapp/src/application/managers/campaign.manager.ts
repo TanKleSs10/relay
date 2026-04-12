@@ -77,6 +77,15 @@ export class CampaignManager {
         );
         return;
       }
+      const queuedCount = await this.messageRepository.countQueuedByCampaign(
+        campaignId
+      );
+      const processingCount = await this.messageRepository.countProcessingByCampaign(
+        campaignId
+      );
+      this.logger.info(
+        `campaign ${campaignId} state: queued=${queuedCount}, processing=${processingCount}, senders_ready=${senders.length}`
+      );
 
       if (this.cachedQueue.length === 0) {
         this.cachedQueue = await this.messageRepository.claimNextBatch(
@@ -189,14 +198,16 @@ export class CampaignManager {
           const streak = (this.failureStreaks.get(sender.id) ?? 0) + 1;
           this.failureStreaks.set(sender.id, streak);
           if (streak >= MAX_CONSECUTIVE_FAILURES) {
-          this.logger.warn(
-            `sender ${sender.id} entered COOLDOWN after ${streak} failures`
-          );
-          try {
-            await this.senderRepository.updateStatus(
-              sender.id,
-              SenderAccountStatus.COOLDOWN
+            this.logger.warn(
+              `sender ${sender.id} entered COOLDOWN after ${streak} failures (total_sent=${this.senderTotals.get(
+                sender.id
+              ) ?? 0})`
             );
+            try {
+              await this.senderRepository.updateStatus(
+                sender.id,
+                SenderAccountStatus.COOLDOWN
+              );
             } catch (error) {
               this.logger.error(
                 `failed to set COOLDOWN for sender ${sender.id}`,
