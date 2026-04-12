@@ -79,6 +79,25 @@ export class MessageRepository {
     return Number(result.rows[0]?.count ?? 0);
   }
 
+  async countProcessingByCampaign(campaignId: number): Promise<number> {
+    const result = await this.pool.query<{ count: string }>(
+      "SELECT COUNT(*) AS count FROM messages WHERE campaign_id = $1 AND status = $2",
+      [campaignId, MessageStatus.PROCESSING]
+    );
+    return Number(result.rows[0]?.count ?? 0);
+  }
+
+  async countRecentLocksByCampaign(
+    campaignId: number,
+    maxAgeMinutes: number
+  ): Promise<number> {
+    const result = await this.pool.query<{ count: string }>(
+      "SELECT COUNT(*) AS count FROM messages WHERE campaign_id = $1 AND status = $2 AND locked_at IS NOT NULL AND locked_at >= NOW() - ($3 || ' minutes')::interval",
+      [campaignId, MessageStatus.PROCESSING, maxAgeMinutes]
+    );
+    return Number(result.rows[0]?.count ?? 0);
+  }
+
   async hasSentIdempotency(
     campaignId: number,
     idempotencyKey: string | null,

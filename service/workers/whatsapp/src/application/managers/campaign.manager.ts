@@ -17,6 +17,7 @@ const FAST_DELAY_RANGE = { min: 150, max: 400 };
 const SLOW_DELAY_RANGE = { min: 400, max: 900 };
 const MAX_CONSECUTIVE_FAILURES = 3;
 const MAX_INIT_RETRIES = 3;
+const PROCESSING_LOCK_WINDOW_MIN = 5;
 
 export class CampaignManager {
   private failureStreaks = new Map<number, number>();
@@ -327,6 +328,24 @@ export class CampaignManager {
         `campaign ${campaignId} still has ${remaining} queued messages`
       );
       return;
+    }
+    const processing = await this.messageRepository.countProcessingByCampaign(
+      campaignId
+    );
+    if (processing > 0) {
+      const recentLocks = await this.messageRepository.countRecentLocksByCampaign(
+        campaignId,
+        PROCESSING_LOCK_WINDOW_MIN
+      );
+      if (recentLocks > 0) {
+        this.logger.info(
+          `campaign ${campaignId} still has ${processing} processing messages`
+        );
+        return;
+      }
+      this.logger.warn(
+        `campaign ${campaignId} has ${processing} stale processing messages`
+      );
     }
     const failed = await this.messageRepository.countFailedByCampaign(campaignId);
     if (failed > 0) {
