@@ -61,6 +61,13 @@ def remove_message(message_id: UUID, db: Session):
     if not message:
         raise NotFoundError("Message not found")
     try:
+        campaign = get_campaign_by_id(db, message.campaign_id)
+        if campaign:
+            campaign.total_messages = max(campaign.total_messages - 1, 0)
+            if message.status == MessageStatus.SENT:
+                campaign.sent_count = max(campaign.sent_count - 1, 0)
+            if message.status in {MessageStatus.FAILED, MessageStatus.NO_WA}:
+                campaign.failed_count = max(campaign.failed_count - 1, 0)
         delete_message(db, message)
         db.commit()
     except Exception as exc:

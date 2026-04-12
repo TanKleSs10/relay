@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from uuid import UUID
 
 from src.application.errors import ConflictError
-from src.domain import Message, MessageStatus
+from src.domain import Campaign, Message, MessageStatus
 from src.infrastructure.machine.message_machine import can_transition
 
 def create_messages(
@@ -40,6 +40,9 @@ def create_messages(
         status=MessageStatus.PENDING,
     )
     db.add(message)
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if campaign:
+        campaign.total_messages += 1
     return message
 
 
