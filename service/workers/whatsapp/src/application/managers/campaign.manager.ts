@@ -149,6 +149,7 @@ export class CampaignManager {
           );
           await this.sendLogRepository.create({
             messageId: message.id,
+            campaignId: message.campaign_id,
             senderId: sender.id,
             workerId: this.workerId,
             status: "FAILED",
@@ -176,6 +177,7 @@ export class CampaignManager {
           );
           await this.sendLogRepository.create({
             messageId: message.id,
+            campaignId: message.campaign_id,
             senderId: sender.id,
             workerId: this.workerId,
             status: "FAILED",
@@ -240,6 +242,7 @@ export class CampaignManager {
         await this.messageRepository.markSent(message.id, senderId);
         await this.sendLogRepository.create({
           messageId: message.id,
+          campaignId: message.campaign_id,
           senderId,
           workerId: this.workerId,
           status: "SENT",
@@ -254,6 +257,7 @@ export class CampaignManager {
       await this.messageRepository.markSent(message.id, senderId);
       await this.sendLogRepository.create({
         messageId: message.id,
+        campaignId: message.campaign_id,
         senderId,
         workerId: this.workerId,
         status: "SENT",
@@ -270,6 +274,7 @@ export class CampaignManager {
         await this.messageRepository.markFailed(message.id, note, senderId);
         await this.sendLogRepository.create({
           messageId: message.id,
+          campaignId: message.campaign_id,
           senderId,
           workerId: this.workerId,
           status: "FAILED",
@@ -282,6 +287,7 @@ export class CampaignManager {
         await this.messageRepository.markNoWa(message.id, senderId);
         await this.sendLogRepository.create({
           messageId: message.id,
+          campaignId: message.campaign_id,
           senderId,
           workerId: this.workerId,
           status: "NO_WA",
