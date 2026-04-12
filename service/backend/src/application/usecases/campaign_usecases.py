@@ -1,10 +1,8 @@
 from datetime import datetime
 from uuid import UUID
 from sqlalchemy import func
-
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
-
 from src.api.schemas.campaigns import CampaignCreate, CampaignUpdate
 from src.application.errors import ConflictError, NotFoundError
 from src.api.service.campaigns import (
@@ -28,10 +26,12 @@ def _ensure_unique_campaign_name(db: Session, name: str) -> None:
         raise ConflictError("Campaign with this name already exists")
 
 
-def _extract_message_row(row: dict[str, object]) -> tuple[str | None, str | None]:
+def _extract_message_row(row: dict[str, str]) -> tuple[str | None, str | None]:
     recipient = row.get("phone") or row.get("recipient") or row.get("phone_number")
     content = row.get("message") or row.get("payload") or row.get("text")
-    return recipient, content
+    recipient_str = recipient if isinstance(recipient, str) else None
+    content_str = content if isinstance(content, str) else None
+    return recipient_str, content_str
 
 
 def create_campaign_with_file(name: str, file: UploadFile | None, db: Session):
@@ -49,8 +49,8 @@ def create_campaign_with_file(name: str, file: UploadFile | None, db: Session):
             return campaign, 0, []
 
         # Read file and create messages
-        reader = get_reader(file.filename)
-        data = reader.read(file)
+        reader = get_reader(str(file.filename))
+        data: list[dict[str, str]] = reader.read(file)
         print(f"Data read from file: {data}")
         created = 0
         invalid_rows: list[dict[str, object]] = []
@@ -88,9 +88,7 @@ def create_campaigns(db: Session, payload: CampaignCreate) -> Campaign:
             CampaignStatus.CREATED,
             CampaignStatus.PAUSED,
         }:
-            raise ConflictError(
-                "Campaign status can only start as CREATED or PAUSED"
-            )
+            raise ConflictError("Campaign status can only start as CREATED or PAUSED")
 
         campaign = create_campaign(db, payload)
         db.commit()
@@ -150,7 +148,7 @@ def remove_campaign(campaign_id: UUID, db: Session):
     }
 
 
-def dispatch_campaign(campaign_id: UUID, db: Session) -> dict[str, str]:
+def dispatch_campaign(campaign_id: UUID, db: Session) -> dict[str, UUID]:
     campaign = get_campaign_by_id(db, campaign_id)
     if not campaign:
         raise NotFoundError("Campaign not found")
@@ -183,14 +181,12 @@ def dispatch_campaign(campaign_id: UUID, db: Session) -> dict[str, str]:
         raise exc
 
 
-def pause_campaign(campaign_id: UUID, db: Session) -> dict[str, str]:
+def pause_campaign(campaign_id: UUID, db: Session) -> dict[str, UUID]:
     campaign = get_campaign_by_id(db, campaign_id)
     if not campaign:
         raise NotFoundError("Campaign not found")
     if not can_transition(campaign.status, CampaignStatus.PAUSED):
-        raise ConflictError(
-            f"Campaign cannot be paused from status {campaign.status}"
-        )
+        raise ConflictError(f"Campaign cannot be paused from status {campaign.status}")
     try:
         campaign.status = CampaignStatus.PAUSED
         db.commit()
@@ -205,9 +201,7 @@ def retry_campaign(campaign_id: UUID, db: Session) -> dict[str, int]:
     if not campaign:
         raise NotFoundError("Campaign not found")
     if not can_transition(campaign.status, CampaignStatus.ACTIVE):
-        raise ConflictError(
-            f"Campaign cannot be retried from status {campaign.status}"
-        )
+        raise ConflictError(f"Campaign cannot be retried from status {campaign.status}")
     active = (
         db.query(Campaign)
         .filter(Campaign.status == CampaignStatus.ACTIVE, Campaign.id != campaign_id)
@@ -241,13 +235,12 @@ def get_campaign_metrics(
     sent_from: datetime | None = None,
     sent_to: datetime | None = None,
     include_no_wa: bool = True,
-) -> dict[str, int | float]:
+) -> dict[str, int | float | UUID]:
     campaign = get_campaign_by_id(db, campaign_id)
     if not campaign:
         raise NotFoundError("Campaign not found")
-    query = (
-        db.query(Message.status, func.count(Message.id))
-        .filter(Message.campaign_id == campaign_id)
+    query = db.query(Message.status, func.count(Message.id)).filter(
+        Message.campaign_id == campaign_id
     )
     if created_from:
         query = query.filter(Message.created_at >= created_from)
@@ -260,7 +253,10 @@ def get_campaign_metrics(
     if not include_no_wa:
         query = query.filter(Message.status != MessageStatus.NO_WA)
 
-    counts = dict(query.group_by(Message.status).all())
+    rows = query.group_by(Message.status).all()
+    counts: dict[MessageStatus, int] = {}
+    for status, count in rows:
+        counts[status] = int(count)
     total = sum(counts.values()) if counts else 0
     sent = counts.get(MessageStatus.SENT, 0)
     failed = counts.get(MessageStatus.FAILED, 0)
