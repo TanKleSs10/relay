@@ -49,10 +49,12 @@ async function syncSessions(
   for (const sender of senders) {
     if (
       sender.status === SenderAccountStatus.CONNECTED ||
-      sender.status === SenderAccountStatus.DISCONNECTED
+      sender.status === SenderAccountStatus.DISCONNECTED ||
+      sender.status === SenderAccountStatus.SENDING
     ) {
       const state = await provider.getState?.(sender.id);
       if (!state) {
+        logger.warn(`sender ${sender.id} state unknown; skipping transition`);
         continue;
       }
       if (state === "CONNECTED") {
@@ -82,6 +84,10 @@ async function syncSessions(
           SenderAccountStatus.DISCONNECTED
         );
       }
+    }
+
+    if (sender.status === SenderAccountStatus.INITIALIZING) {
+      continue;
     }
 
     if (sender.status === SenderAccountStatus.DISCONNECTED) {
