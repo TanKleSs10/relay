@@ -3,7 +3,7 @@ import { Spinner } from "../ui/Spinner";
 
 const formatPercent = (value: number) => `${Math.round(value * 100)}%`;
 
-export function CampaignMetricsPanel({ campaignId }: { campaignId: number }) {
+export function CampaignMetricsPanel({ campaignId }: { campaignId: string }) {
   const { data, isLoading } = useCampaignMetrics(campaignId);
 
   if (isLoading) {

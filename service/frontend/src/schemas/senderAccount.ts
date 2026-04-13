@@ -13,16 +13,22 @@ export const SenderAccountStatusSchema = z.enum([
 ]);
 
 export const SenderAccountSchema = z.object({
-  id: z.number().int(),
+  id: z.string().uuid(),
+  label: z.string().min(1),
   phone_number: z.string().nullable().optional(),
   status: SenderAccountStatusSchema,
-  qr_code: z.string().nullable().optional(),
-  qr_generated_at: z.string().datetime().nullable().optional(),
-  session_path: z.string().nullable().optional(),
   cooldown_until: z.string().datetime().nullable().optional(),
   last_sent_at: z.string().datetime().nullable().optional(),
+  last_seen_at: z.string().datetime().nullable().optional(),
   created_at: z.string().datetime().nullable().optional(),
   updated_at: z.string().datetime().nullable().optional(),
 });
 
+export const SenderQrSchema = z.object({
+  sender_account_id: z.string().uuid(),
+  qr_code: z.string().nullable().optional(),
+  qr_generated_at: z.string().datetime().nullable().optional(),
+});
+
 export type SenderAccount = z.infer<typeof SenderAccountSchema>;
+export type SenderQr = z.infer<typeof SenderQrSchema>;

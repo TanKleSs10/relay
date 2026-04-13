@@ -12,6 +12,7 @@ import {
   useDeleteSenderAccount,
   useResetSenderSession,
   useSenderAccounts,
+  useSenderQr,
 } from "../features";
 
 const senderStatusLabels: Record<string, string> = {
@@ -33,6 +34,8 @@ export function ManageChannelsPage() {
   const deleteSender = useDeleteSenderAccount();
   const resetSession = useResetSenderSession();
   const [qrModalSender, setQrModalSender] = useState<SenderAccount | null>(null);
+  const qrSenderId = qrModalSender?.id ?? "";
+  const { data: qrData } = useSenderQr(qrSenderId, Boolean(qrModalSender));
 
   const modalSender = qrModalSender
     ? channels.find((item) => item.id === qrModalSender.id) || qrModalSender
@@ -59,7 +62,7 @@ export function ManageChannelsPage() {
             <p className="channel-row__title">Canal #{sender.id}</p>
             <div className="channel-row__meta">
               <span className="channel-row__meta-item">
-                Teléfono: <strong>{sender.phone_number || "-"}</strong>
+                {sender.label} · Teléfono: <strong>{sender.phone_number || "-"}</strong>
               </span>
               <span className="channel-row__meta-item">
                 Estado: <span className={`channel-status ${statusClass}`}>{senderStatusLabels[sender.status] || sender.status}</span>
@@ -70,7 +73,7 @@ export function ManageChannelsPage() {
             <Button
               size="small"
               variant="tertiary"
-              disabled={!sender.qr_code}
+              disabled={sender.status !== "WAITING_QR"}
               onClick={() => setQrModalSender(sender)}
             >
               Ver QR
@@ -164,13 +167,13 @@ export function ManageChannelsPage() {
       >
         <div className="qr-modal__content">
           <h3 className="campaigns__title">QR del Canal</h3>
-          {modalSender?.qr_code ? (
-            <img className="qr-modal__image" src={modalSender.qr_code} alt="QR del canal" />
+          {qrData?.qr_code ? (
+            <img className="qr-modal__image" src={qrData.qr_code} alt="QR del canal" />
           ) : (
             <div className="qr-modal__image u-flex u-flex-center u-color-meta">Sin QR disponible</div>
           )}
           <p className="qr-modal__text">
-            {modalSender?.qr_code
+            {qrData?.qr_code
               ? "Escanea este QR para conectar el canal."
               : "Este canal no tiene QR disponible todavía."}
           </p>

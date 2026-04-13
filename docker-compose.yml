@@ -32,6 +32,8 @@ services:
     environment:
       - NO_SANDBOX=1
     volumes:
+      - ./service/workers/whatsapp:/app
+      - /app/node_modules
       - whatsapp_auth:/app/.wwebjs_auth
     depends_on:
       - db
@@ -46,6 +48,9 @@ services:
       - .env
     environment:
       - VITE_API_PROXY_TARGET=http://api:8000
+    volumes:
+      - ./service/frontend:/app
+      - /app/node_modules
     ports:
       - "5173:5173"
     depends_on:

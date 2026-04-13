@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from fastapi import Depends, Request
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from src.application.errors import UnauthorizedError
 from src.config import get_settings
-from src.domain import User, UserStatus
+from src.domain import Role, RolePermission, User, UserRole, UserStatus
 from src.infrastructure.db.session import SessionLocal
 from src.security.jwt import decode_token
 
@@ -24,20 +26,36 @@ def get_db():
 
 def require_user(request: Request, db: Session = Depends(get_db)) -> User:
     user = get_current_user(request)
+    user_id = None
     if user and user.status == UserStatus.ACTIVE:
-        return user
+        user_id = str(user.id)
 
     settings = get_settings()
-    token = request.cookies.get(settings.jwt_cookie_name)
-    if not token:
-        raise UnauthorizedError("Missing authentication token")
-
-    payload = decode_token(token, settings.jwt_secret)
-    user_id = payload.get("sub")
     if not user_id:
-        raise UnauthorizedError("Invalid authentication token")
+        token = request.cookies.get(settings.jwt_cookie_name)
+        if not token:
+            raise UnauthorizedError("Missing authentication token")
 
-    user = db.query(User).filter(User.id == user_id).first()
+        payload = decode_token(token, settings.jwt_secret)
+        user_id = payload.get("sub")
+        if not user_id:
+            raise UnauthorizedError("Invalid authentication token")
+
+    try:
+        user_uuid = UUID(user_id)
+    except ValueError as error:
+        raise UnauthorizedError("Invalid authentication token") from error
+    user = (
+        db.query(User)
+        .options(
+            selectinload(User.roles)
+            .selectinload(UserRole.role)
+            .selectinload(Role.permissions)
+            .selectinload(RolePermission.permission)
+        )
+        .filter(User.id == user_uuid)
+        .first()
+    )
     if not user or user.status != UserStatus.ACTIVE:
         raise UnauthorizedError("User not found or inactive")
 

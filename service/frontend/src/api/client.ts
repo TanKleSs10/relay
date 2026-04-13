@@ -20,6 +20,7 @@ export async function request<T>(path: string, options: RequestOptions = {}) {
   const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
   const init: RequestInit = {
     method,
+    credentials: "include",
     headers: {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...headers,
@@ -54,6 +55,7 @@ export async function requestWithMeta<T>(path: string, options: RequestOptions =
   const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
   const init: RequestInit = {
     method,
+    credentials: "include",
     headers: {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...headers,

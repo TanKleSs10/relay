@@ -4,7 +4,7 @@ import type { Message, MessagePayload, MessageUpdatePayload } from "../message.t
 type ListMessagesParams = {
   skip?: number;
   limit?: number;
-  campaignId?: number;
+  campaignId?: string;
   status?: string;
 };
 
@@ -16,8 +16,8 @@ export function listMessages(params: ListMessagesParams = {}) {
   if (typeof params.limit === "number") {
     searchParams.set("limit", String(params.limit));
   }
-  if (typeof params.campaignId === "number") {
-    searchParams.set("campaign_id", String(params.campaignId));
+  if (typeof params.campaignId === "string" && params.campaignId.length > 0) {
+    searchParams.set("campaign_id", params.campaignId);
   }
   if (typeof params.status === "string" && params.status.length > 0) {
     searchParams.set("status", params.status);
@@ -31,7 +31,7 @@ export function listMessages(params: ListMessagesParams = {}) {
   );
 }
 
-export function getMessage(messageId: number) {
+export function getMessage(messageId: string) {
   return request<Message>(`/messages/${messageId}`);
 }
 
@@ -42,14 +42,14 @@ export function createMessage(payload: MessagePayload) {
   });
 }
 
-export function updateMessage(messageId: number, payload: MessageUpdatePayload) {
+export function updateMessage(messageId: string, payload: MessageUpdatePayload) {
   return request<Message>(`/messages/${messageId}`, {
     method: "PATCH",
     body: payload,
   });
 }
 
-export function deleteMessage(messageId: number) {
+export function deleteMessage(messageId: string) {
   return request(`/messages/${messageId}`, {
     method: "DELETE",
   });

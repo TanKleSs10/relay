@@ -19,8 +19,8 @@ import {
 export function ManageCampaignPage() {
   const { campaignId } = useParams();
   const queryClient = useQueryClient();
-  const campaignIdNumber = campaignId ? Number(campaignId) : NaN;
-  const { data: campaign, isLoading } = useCampaign(campaignIdNumber);
+  const campaignIdValue = campaignId ?? "";
+  const { data: campaign, isLoading } = useCampaign(campaignIdValue);
   const deleteCampaign = useDeleteCampaign();
   const deleteMessage = useDeleteMessage();
   const retryCampaign = useRetryCampaign();
@@ -28,7 +28,7 @@ export function ManageCampaignPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const pageSize = 25;
   const { data: messagesData, isLoading: isLoadingMessages } = useMessages({
-    campaignId: campaignIdNumber,
+    campaignId: campaignIdValue,
     page,
     limit: pageSize,
     status: statusFilter === "all" ? undefined : statusFilter,
@@ -55,7 +55,7 @@ export function ManageCampaignPage() {
     return message || "No se pudo reintentar";
   };
 
-  if (!campaignId || Number.isNaN(campaignIdNumber)) {
+  if (!campaignIdValue) {
     return (
       <EmptyState
         icon="⚠️"

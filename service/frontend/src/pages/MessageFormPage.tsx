@@ -38,8 +38,8 @@ export function MessageFormPage() {
     },
   });
 
-  const messageIdNumber = messageId ? Number(messageId) : NaN;
-  const { data: message } = useMessage(messageIdNumber);
+  const messageIdValue = messageId ?? "";
+  const { data: message } = useMessage(messageIdValue);
 
   useEffect(() => {
     if (!messageId) return;
@@ -54,16 +54,12 @@ export function MessageFormPage() {
     return <p>No se encontró la campaña.</p>;
   }
 
-  if (!Number.isFinite(Number(campaignId))) {
-    return <p>No se encontró la campaña.</p>;
-  }
-
   const onSubmit = (values: FormValues) => {
-    const payload = { ...values, campaign_id: Number(campaignId) };
+    const payload = { ...values, campaign_id: campaignId };
     if (messageId) {
       const updatePayload = { recipient: values.recipient, content: values.content };
       updateMessage.mutate(
-        { messageId: Number(messageId), payload: updatePayload },
+        { messageId, payload: updatePayload },
         {
           onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["campaigns"] });
