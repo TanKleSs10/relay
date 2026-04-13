@@ -11,3 +11,7 @@ export function login(payload: LoginPayload) {
 export function getMe() {
   return request<AuthUser>("/auth/me");
 }
+
+export function logout() {
+  return request("/auth/logout", { method: "POST" });
+}

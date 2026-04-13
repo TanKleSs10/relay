@@ -17,7 +17,7 @@ export function DashboardActions({ connectedSenders, sendingSenders }: Props) {
           📧 Crear Campaña
         </Link>
       </div>
-      <div className="senders-summary" style={{ marginTop: "20px" }}>
+      <div className="senders-summary" style={{ marginTop: "20px", marginRight: "20px" }}>
         <span className="senders-summary__label" title="Senders listos para enviar mensajes">
           Senders disponibles
         </span>
