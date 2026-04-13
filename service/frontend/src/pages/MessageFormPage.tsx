@@ -1,9 +1,11 @@
 import { useEffect } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 
-import { Button } from "../components/ui/Button";
+import { MessageFormHeader } from "../components/message-form/MessageFormHeader";
+import { MessageFormFields } from "../components/message-form/MessageFormFields";
+import { MessageFormActions } from "../components/message-form/MessageFormActions";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -89,41 +91,13 @@ export function MessageFormPage() {
   return (
     <>
       <div className="form-container">
-        <h2>{messageId ? "Editar Mensaje" : "Crear Mensaje"}</h2>
+        <MessageFormHeader title={messageId ? "Editar Mensaje" : "Crear Mensaje"} />
         <form onSubmit={handleSubmit(onSubmit)}>
-          <div className="form-group">
-            <label className="form-label" htmlFor="recipient">
-              Para (teléfono):
-            </label>
-            <input
-              className="form-input"
-              type="text"
-              id="recipient"
-              maxLength={50}
-              {...register("recipient")}
-            />
-            {errors.recipient ? <p className="error-message">{errors.recipient.message}</p> : null}
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="content">
-              Mensaje:
-            </label>
-            <textarea
-              className="form-textarea"
-              id="content"
-              maxLength={500}
-              {...register("content")}
-            />
-            {errors.content ? <p className="error-message">{errors.content.message}</p> : null}
-          </div>
-          <div className="form-actions">
-            <Button type="submit" variant="success">
-              Guardar
-            </Button>
-            <Link to={`/manage-campaign/${campaignId}`} className="btn btn--secondary">
-              Cancelar
-            </Link>
-          </div>
+          <MessageFormFields register={register} errors={errors} />
+          <MessageFormActions
+            campaignId={campaignId}
+            isSubmitting={createMessage.isPending || updateMessage.isPending}
+          />
         </form>
       </div>
     </>

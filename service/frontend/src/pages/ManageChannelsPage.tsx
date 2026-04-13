@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-
 import { Button } from "../components/ui/Button";
-import { EmptyState } from "../components/ui/EmptyState";
 import { Spinner } from "../components/ui/Spinner";
+import { ChannelList } from "../components/manage-channels/ChannelList";
+import { ChannelQrModal } from "../components/manage-channels/ChannelQrModal";
 import type { SenderAccount } from "../schemas";
 import {
   useCreateSenderAccount,
@@ -14,18 +14,6 @@ import {
   useSenderAccounts,
   useSenderQr,
 } from "../features";
-
-const senderStatusLabels: Record<string, string> = {
-  CREATED: "Creado",
-  INITIALIZING: "Inicializando",
-  WAITING_QR: "Esperando QR",
-  CONNECTED: "Conectado",
-  SENDING: "Enviando",
-  COOLDOWN: "En enfriamiento",
-  DISCONNECTED: "Desconectado",
-  BLOCKED: "Bloqueado",
-  ERROR: "Error",
-};
 
 export function ManageChannelsPage() {
   const queryClient = useQueryClient();
@@ -40,83 +28,6 @@ export function ManageChannelsPage() {
   const modalSender = qrModalSender
     ? channels.find((item) => item.id === qrModalSender.id) || qrModalSender
     : null;
-
-  const channelsList = useMemo(() => {
-    if (channels.length === 0) {
-      return (
-        <EmptyState
-          icon="📡"
-          title="Sin Canales"
-          description="No hay canales creados todavía."
-        />
-      );
-    }
-
-    return channels.map((sender) => {
-      const statusClass = `channel-status--${String(sender.status || "")
-        .toLowerCase()
-        .replace("_", "-")}`;
-      return (
-        <article key={sender.id} className="channel-row">
-          <div className="channel-row__main">
-            <p className="channel-row__title">Canal #{sender.id}</p>
-            <div className="channel-row__meta">
-              <span className="channel-row__meta-item">
-                {sender.label} · Teléfono: <strong>{sender.phone_number || "-"}</strong>
-              </span>
-              <span className="channel-row__meta-item">
-                Estado: <span className={`channel-status ${statusClass}`}>{senderStatusLabels[sender.status] || sender.status}</span>
-              </span>
-            </div>
-          </div>
-            <div className="channel-row__actions">
-            <Button
-              size="small"
-              variant="tertiary"
-              disabled={sender.status !== "WAITING_QR"}
-              onClick={() => setQrModalSender(sender)}
-            >
-              Ver QR
-            </Button>
-            <Button
-              size="small"
-              variant="secondary"
-              onClick={() =>
-                resetSession.mutate(sender.id, {
-                  onSuccess: () => {
-                    queryClient.invalidateQueries({ queryKey: ["sender-accounts"] });
-                    toast.success("Sesión reiniciada");
-                  },
-                  onError: () => {
-                    toast.error("No se pudo reiniciar la sesión");
-                  },
-                })
-              }
-            >
-              Reset sesión
-            </Button>
-            <Button
-              size="small"
-              variant="danger"
-              onClick={() =>
-                deleteSender.mutate(sender.id, {
-                  onSuccess: () => {
-                    queryClient.invalidateQueries({ queryKey: ["sender-accounts"] });
-                    toast.success("Canal eliminado");
-                  },
-                  onError: () => {
-                    toast.error("No se pudo eliminar el canal");
-                  },
-                })
-              }
-            >
-              Eliminar
-            </Button>
-          </div>
-        </article>
-      );
-    });
-  }, [channels]);
 
   return (
     <>
@@ -152,36 +63,41 @@ export function ManageChannelsPage() {
               <Spinner label="Cargando canales..." />
             </div>
           ) : (
-            channelsList
+            <ChannelList
+              channels={channels}
+              onViewQr={(sender) => setQrModalSender(sender)}
+              onResetSession={(senderId) =>
+                resetSession.mutate(senderId, {
+                  onSuccess: () => {
+                    queryClient.invalidateQueries({ queryKey: ["sender-accounts"] });
+                    toast.success("Sesión reiniciada");
+                  },
+                  onError: () => {
+                    toast.error("No se pudo reiniciar la sesión");
+                  },
+                })
+              }
+              onDelete={(senderId) =>
+                deleteSender.mutate(senderId, {
+                  onSuccess: () => {
+                    queryClient.invalidateQueries({ queryKey: ["sender-accounts"] });
+                    toast.success("Canal eliminado");
+                  },
+                  onError: () => {
+                    toast.error("No se pudo eliminar el canal");
+                  },
+                })
+              }
+            />
           )}
         </div>
       </section>
 
-      <div
-        className={`qr-modal ${modalSender ? "qr-modal--open" : ""}`}
-        onClick={(event) => {
-          if (event.target === event.currentTarget) {
-            setQrModalSender(null);
-          }
-        }}
-      >
-        <div className="qr-modal__content">
-          <h3 className="campaigns__title">QR del Canal</h3>
-          {qrData?.qr_code ? (
-            <img className="qr-modal__image" src={qrData.qr_code} alt="QR del canal" />
-          ) : (
-            <div className="qr-modal__image u-flex u-flex-center u-color-meta">Sin QR disponible</div>
-          )}
-          <p className="qr-modal__text">
-            {qrData?.qr_code
-              ? "Escanea este QR para conectar el canal."
-              : "Este canal no tiene QR disponible todavía."}
-          </p>
-          <Button variant="secondary" size="small" onClick={() => setQrModalSender(null)}>
-            Cerrar
-          </Button>
-        </div>
-      </div>
+      <ChannelQrModal
+        isOpen={Boolean(modalSender)}
+        qrCode={qrData?.qr_code}
+        onClose={() => setQrModalSender(null)}
+      />
     </>
   );
 }

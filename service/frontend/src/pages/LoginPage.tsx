@@ -3,7 +3,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 
-import { Button } from "../components/ui/Button";
+import { LoginActions } from "../components/login/LoginActions";
+import { LoginFields } from "../components/login/LoginFields";
+import { LoginHeader } from "../components/login/LoginHeader";
 import { useLogin } from "../features";
 import { loginSchema, type LoginSchema } from "../schemas";
 
@@ -34,45 +36,13 @@ export function LoginPage() {
   return (
     <main className="auth-screen">
       <section className="form-container">
-        <header className="auth-header">
-          <h1 className="auth-title">Iniciar sesión</h1>
-        </header>
+        <LoginHeader
+          title="Iniciar sesión"
+          subtitle="Accede para gestionar campañas y canales."
+        />
         <form className="auth-form" onSubmit={handleSubmit(onSubmit)}>
-          <div className="form-group">
-            <label className="form-label" htmlFor="email">
-              Correo
-            </label>
-            <input
-              id="email"
-              type="email"
-              className="form-input"
-              placeholder="admin@relay.com"
-              autoComplete="email"
-              {...register("email")}
-            />
-            {errors.email ? <p className="error-message">{errors.email.message}</p> : null}
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="password">
-              Contraseña
-            </label>
-            <input
-              id="password"
-              type="password"
-              className="form-input"
-              placeholder="••••••••"
-              autoComplete="current-password"
-              {...register("password")}
-            />
-            {errors.password ? (
-              <p className="error-message">{errors.password.message}</p>
-            ) : null}
-          </div>
-          <div className="form-actions">
-            <Button type="submit" variant="primary" disabled={loginMutation.isPending}>
-              {loginMutation.isPending ? "Ingresando..." : "Ingresar"}
-            </Button>
-          </div>
+          <LoginFields register={register} errors={errors} />
+          <LoginActions isSubmitting={loginMutation.isPending} />
         </form>
       </section>
     </main>
