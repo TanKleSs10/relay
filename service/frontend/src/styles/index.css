@@ -465,7 +465,7 @@ a {
   margin-left: auto;
 }
 
-.qr-modal {
+.modal {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.65);
@@ -475,11 +475,11 @@ a {
   z-index: 1000;
 }
 
-.qr-modal--open {
+.modal--open {
   display: flex;
 }
 
-.qr-modal__content {
+.modal__content {
   background: var(--color-card-bg);
   border-radius: 8px;
   box-shadow: var(--color-card-shadow-hover);
@@ -491,7 +491,7 @@ a {
   align-items: center;
 }
 
-.qr-modal__image {
+.modal__image {
   width: 100%;
   max-width: 280px;
   height: auto;
@@ -499,7 +499,7 @@ a {
   background: #fff;
 }
 
-.qr-modal__text {
+.modal__text {
   color: var(--color-card-meta-label);
   text-align: center;
   font-size: 0.95rem;

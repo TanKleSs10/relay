@@ -5,8 +5,8 @@ import { toast } from "react-toastify";
 import { Button } from "../components/ui/Button";
 import { Spinner } from "../components/ui/Spinner";
 import { ChannelList } from "../components/manage-channels/ChannelList";
-import { ChannelQrModal } from "../components/manage-channels/ChannelQrModal";
 import type { SenderAccount } from "../schemas";
+import { Modal } from "../components/ui/Modal";
 import {
   useCreateSenderAccount,
   useDeleteSenderAccount,
@@ -93,11 +93,26 @@ export function ManageChannelsPage() {
         </div>
       </section>
 
-      <ChannelQrModal
-        isOpen={Boolean(modalSender)}
-        qrCode={qrData?.qr_code}
-        onClose={() => setQrModalSender(null)}
-      />
+      <Modal isOpen={Boolean(modalSender)} onClose={() => setQrModalSender(null)}>
+        <div className="modal__content">
+          <h3 className="campaigns__title">QR del Canal</h3>
+          {qrData?.qr_code ? (
+            <img className="modal__image" src={qrData.qr_code} alt="QR del canal" />
+          ) : (
+            <div className="modal__image u-flex u-flex-center u-color-meta">
+              Sin QR disponible
+            </div>
+          )}
+          <p className="modal__text">
+            {qrData?.qr_code
+              ? "Escanea este QR para conectar el canal."
+              : "Este canal no tiene QR disponible todavía."}
+          </p>
+          <Button variant="secondary" size="small" onClick={() => setQrModalSender(null)}>
+            Cerrar
+          </Button>
+        </div>
+      </Modal>
     </>
   );
 }
