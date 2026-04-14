@@ -8,6 +8,7 @@ import {
   listSenderAccounts,
   resetSenderSession,
 } from "../api/sender-account.api";
+import type { SenderAccountCreatePayload } from "../sender-account.types";
 
 export const senderAccountKeys = {
   all: ["sender-accounts"] as const,
@@ -40,7 +41,7 @@ export const useSenderQr = (senderId: string, enabled = true) =>
 
 export const useCreateSenderAccount = () =>
   useMutation({
-    mutationFn: createSenderAccount,
+    mutationFn: (payload: SenderAccountCreatePayload) => createSenderAccount(payload),
   });
 
 export const useDeleteSenderAccount = () =>

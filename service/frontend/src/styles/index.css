@@ -159,6 +159,21 @@ a {
   gap: 0.5rem;
 }
 
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.btn:disabled:hover,
+.btn[aria-disabled="true"]:hover {
+  background-color: inherit;
+  box-shadow: none;
+  transform: none;
+}
+
 .btn--primary {
   background-color: var(--color-btn-primary);
   color: white;
@@ -207,6 +222,18 @@ a {
 .btn--tertiary:hover {
   background-color: var(--color-btn-tertiary-hover);
   box-shadow: var(--color-btn-tertiary-shadow);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--color-card-name);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.btn--ghost:hover {
+  border-color: var(--color-btn-primary);
+  box-shadow: var(--color-btn-primary-shadow);
+  color: #fff;
 }
 
 .btn--small {
@@ -411,6 +438,12 @@ a {
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--color-card-name);
+}
+
+.channel-row__header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .channel-row__meta {

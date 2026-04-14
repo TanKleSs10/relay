@@ -1,5 +1,5 @@
 import { request } from "../../../api";
-import type { SenderAccount, SenderQr } from "../sender-account.types";
+import type { SenderAccount, SenderAccountCreatePayload, SenderQr } from "../sender-account.types";
 
 export function listSenderAccounts() {
   return request<SenderAccount[]>("/sender-accounts");
@@ -9,8 +9,11 @@ export function getSenderAccount(senderId: string) {
   return request<SenderAccount>(`/sender-accounts/${senderId}`);
 }
 
-export function createSenderAccount() {
-  return request<SenderAccount>("/sender-accounts/create", { method: "POST" });
+export function createSenderAccount(payload: SenderAccountCreatePayload) {
+  return request<SenderAccount>("/sender-accounts/create", {
+    method: "POST",
+    body: payload,
+  });
 }
 
 export function deleteSenderAccount(senderId: string) {

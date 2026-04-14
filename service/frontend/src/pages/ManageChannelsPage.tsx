@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import { Button } from "../components/ui/Button";
 import { Spinner } from "../components/ui/Spinner";
 import { ChannelList } from "../components/manage-channels/ChannelList";
+import { ChannelCreateModal } from "../components/manage-channels/ChannelCreateModal";
 import type { SenderAccount } from "../schemas";
 import { Modal } from "../components/ui/Modal";
 import {
@@ -21,6 +22,8 @@ export function ManageChannelsPage() {
   const createSender = useCreateSenderAccount();
   const deleteSender = useDeleteSenderAccount();
   const resetSession = useResetSenderSession();
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
   const [qrModalSender, setQrModalSender] = useState<SenderAccount | null>(null);
   const qrSenderId = qrModalSender?.id ?? "";
   const { data: qrData } = useSenderQr(qrSenderId, Boolean(qrModalSender));
@@ -39,15 +42,7 @@ export function ManageChannelsPage() {
           <Button
             variant="primary"
             onClick={() =>
-              createSender.mutate(undefined, {
-                onSuccess: () => {
-                  queryClient.invalidateQueries({ queryKey: ["sender-accounts"] });
-                  toast.success("Canal creado");
-                },
-                onError: () => {
-                  toast.error("No se pudo crear el canal");
-                },
-              })
+              setIsCreateOpen(true)
             }
           >
             ➕ Crear Canal
@@ -113,6 +108,36 @@ export function ManageChannelsPage() {
           </Button>
         </div>
       </Modal>
+      <ChannelCreateModal
+        isOpen={isCreateOpen}
+        label={newLabel}
+        onLabelChange={setNewLabel}
+        onClose={() => {
+          setIsCreateOpen(false);
+          setNewLabel("");
+        }}
+        onSubmit={() => {
+          if (!newLabel.trim()) {
+            toast.error("El nombre es requerido");
+            return;
+          }
+          createSender.mutate(
+            { label: newLabel.trim() },
+            {
+              onSuccess: () => {
+                queryClient.invalidateQueries({ queryKey: ["sender-accounts"] });
+                toast.success("Canal creado");
+                setIsCreateOpen(false);
+                setNewLabel("");
+              },
+              onError: () => {
+                toast.error("No se pudo crear el canal");
+              },
+            }
+          );
+        }}
+        isSubmitting={createSender.isPending}
+      />
     </>
   );
 }
