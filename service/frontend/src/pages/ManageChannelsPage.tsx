@@ -6,6 +6,7 @@ import { Button } from "../components/ui/Button";
 import { Spinner } from "../components/ui/Spinner";
 import { ChannelList } from "../components/manage-channels/ChannelList";
 import { ChannelCreateModal } from "../components/manage-channels/ChannelCreateModal";
+import { ChannelEditModal } from "../components/manage-channels/ChannelEditModal";
 import type { SenderAccount } from "../schemas";
 import { Modal } from "../components/ui/Modal";
 import {
@@ -14,16 +15,21 @@ import {
   useResetSenderSession,
   useSenderAccounts,
   useSenderQr,
+  useUpdateSenderAccount,
 } from "../features";
+import { ArrowLeft, CirclePlus } from "lucide-react";
 
 export function ManageChannelsPage() {
   const queryClient = useQueryClient();
   const { data: channels = [], isLoading } = useSenderAccounts();
   const createSender = useCreateSenderAccount();
+  const updateSender = useUpdateSenderAccount();
   const deleteSender = useDeleteSenderAccount();
   const resetSession = useResetSenderSession();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newLabel, setNewLabel] = useState("");
+  const [editSender, setEditSender] = useState<SenderAccount | null>(null);
+  const [editLabel, setEditLabel] = useState("");
   const [qrModalSender, setQrModalSender] = useState<SenderAccount | null>(null);
   const qrSenderId = qrModalSender?.id ?? "";
   const { data: qrData } = useSenderQr(qrSenderId, Boolean(qrModalSender));
@@ -37,7 +43,7 @@ export function ManageChannelsPage() {
       <section className="actions">
         <div className="actions__group">
           <Link to="/" className="btn btn--secondary">
-            ← Volver al Panel
+            <ArrowLeft /> Volver al Panel
           </Link>
           <Button
             variant="primary"
@@ -45,7 +51,7 @@ export function ManageChannelsPage() {
               setIsCreateOpen(true)
             }
           >
-            ➕ Crear Canal
+            <CirclePlus /> Crear Canal
           </Button>
         </div>
       </section>
@@ -61,6 +67,10 @@ export function ManageChannelsPage() {
             <ChannelList
               channels={channels}
               onViewQr={(sender) => setQrModalSender(sender)}
+              onEdit={(sender) => {
+                setEditSender(sender);
+                setEditLabel(sender.label);
+              }}
               onResetSession={(senderId) =>
                 resetSession.mutate(senderId, {
                   onSuccess: () => {
@@ -137,6 +147,37 @@ export function ManageChannelsPage() {
           );
         }}
         isSubmitting={createSender.isPending}
+      />
+      <ChannelEditModal
+        isOpen={Boolean(editSender)}
+        label={editLabel}
+        onLabelChange={setEditLabel}
+        onClose={() => {
+          setEditSender(null);
+          setEditLabel("");
+        }}
+        onSubmit={() => {
+          if (!editSender) return;
+          if (!editLabel.trim()) {
+            toast.error("El nombre es requerido");
+            return;
+          }
+          updateSender.mutate(
+            { senderId: editSender.id, payload: { label: editLabel.trim() } },
+            {
+              onSuccess: () => {
+                queryClient.invalidateQueries({ queryKey: ["sender-accounts"] });
+                toast.success("Canal actualizado");
+                setEditSender(null);
+                setEditLabel("");
+              },
+              onError: () => {
+                toast.error("No se pudo actualizar el canal");
+              },
+            }
+          );
+        }}
+        isSubmitting={updateSender.isPending}
       />
     </>
   );

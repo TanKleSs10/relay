@@ -18,11 +18,12 @@ const senderStatusLabels: Record<string, string> = {
 type Props = {
   channels: SenderAccount[];
   onViewQr: (sender: SenderAccount) => void;
+  onEdit: (sender: SenderAccount) => void;
   onResetSession: (senderId: string) => void;
   onDelete: (senderId: string) => void;
 };
 
-export function ChannelList({ channels, onViewQr, onResetSession, onDelete }: Props) {
+export function ChannelList({ channels, onViewQr, onEdit, onResetSession, onDelete }: Props) {
   if (channels.length === 0) {
     return (
       <EmptyState
@@ -42,10 +43,7 @@ export function ChannelList({ channels, onViewQr, onResetSession, onDelete }: Pr
         return (
           <article key={sender.id} className="channel-row">
             <div className="channel-row__main">
-              <div className="channel-row__header">
-                <p className="channel-row__title">{sender.label}</p>
-                <Button size="small" variant="primary">editar</Button>
-              </div>
+              <p className="channel-row__title">{sender.label}</p>
               <div className="channel-row__meta">
                 <span className="channel-row__meta-item">
                   #{sender.id.slice(0, 6)} · Teléfono: <strong>{sender.phone_number || "-"}</strong>
@@ -67,6 +65,9 @@ export function ChannelList({ channels, onViewQr, onResetSession, onDelete }: Pr
                 onClick={() => onViewQr(sender)}
               >
                 Ver QR
+              </Button>
+              <Button size="small" variant="ghost" onClick={() => onEdit(sender)}>
+                Editar
               </Button>
               <Button
                 size="small"

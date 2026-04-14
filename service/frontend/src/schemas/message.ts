@@ -10,6 +10,7 @@ export const MessageStatusSchema = z.enum([
 
 export const MessageSchema = z.object({
   id: z.string().uuid(),
+  external_id: z.string().nullable().optional(),
   recipient: z.string().min(1),
   content: z.string().min(1),
   status: MessageStatusSchema,

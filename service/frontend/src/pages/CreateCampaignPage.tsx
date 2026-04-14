@@ -9,6 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 
 import { useUploadCampaign } from "../features";
+import { ArrowLeft } from "lucide-react";
 
 const formSchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
@@ -57,7 +58,7 @@ export function CreateCampaignPage() {
     <>
       <section className="actions">
         <Link className="btn btn--primary" to="/">
-          Volver al Panel
+          <ArrowLeft /> Volver al Panel
         </Link>
       </section>
       <section className="campaign-form">

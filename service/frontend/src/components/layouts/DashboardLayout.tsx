@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 
 import { useLogout, useMe } from "../../features";
+import { SquareArrowRightExit } from "lucide-react";
 
 export function DashboardLayout() {
   const { data: user } = useMe();
@@ -35,7 +36,7 @@ export function DashboardLayout() {
               }
               disabled={logoutMutation.isPending}
             >
-              Cerrar sesión
+              <SquareArrowRightExit /> Cerrar sesión
             </button>
           </div>
         </div>

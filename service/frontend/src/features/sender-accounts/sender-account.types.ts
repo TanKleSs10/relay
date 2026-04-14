@@ -7,3 +7,7 @@ export type SenderQr = z.infer<typeof SenderQrSchema>;
 export type SenderAccountCreatePayload = {
   label: string;
 };
+
+export type SenderAccountUpdatePayload = {
+  label?: string;
+};

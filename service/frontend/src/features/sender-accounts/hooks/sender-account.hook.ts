@@ -7,8 +7,9 @@ import {
   getSenderQr,
   listSenderAccounts,
   resetSenderSession,
+  updateSenderAccount,
 } from "../api/sender-account.api";
-import type { SenderAccountCreatePayload } from "../sender-account.types";
+import type { SenderAccountCreatePayload, SenderAccountUpdatePayload } from "../sender-account.types";
 
 export const senderAccountKeys = {
   all: ["sender-accounts"] as const,
@@ -52,4 +53,15 @@ export const useDeleteSenderAccount = () =>
 export const useResetSenderSession = () =>
   useMutation({
     mutationFn: (senderId: string) => resetSenderSession(senderId),
+  });
+
+export const useUpdateSenderAccount = () =>
+  useMutation({
+    mutationFn: ({
+      senderId,
+      payload,
+    }: {
+      senderId: string;
+      payload: SenderAccountUpdatePayload;
+    }) => updateSenderAccount(senderId, payload),
   });

@@ -1,3 +1,4 @@
+import { Cog, FilePlusCorner, MessageCirclePlus, Users } from "lucide-react";
 import { Link } from "react-router";
 
 type Props = {
@@ -11,10 +12,13 @@ export function DashboardActions({ connectedSenders, sendingSenders }: Props) {
       <h2 className="actions__title">Acciones</h2>
       <div className="actions__group">
         <Link to="/manage-channels" className="btn btn--primary">
-          ⚙️ Administrar Canales
+          <MessageCirclePlus /> Administrar Canales
+        </Link>
+        <Link to="/manage-users" className="btn btn--secondary">
+          <Users /> Administrar Usuarios
         </Link>
         <Link to="/create-campaign" className="btn btn--tertiary">
-          📧 Crear Campaña
+          <FilePlusCorner /> Crear Campaña
         </Link>
       </div>
       <div className="senders-summary" style={{ marginTop: "20px", marginRight: "20px" }}>

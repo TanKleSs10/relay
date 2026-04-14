@@ -5,6 +5,7 @@ import { DashboardPage } from "../pages/DashboardPage"
 import { LoginPage } from "../pages/LoginPage"
 import { ManageCampaignPage } from "../pages/ManageCampaignPage"
 import { ManageChannelsPage } from "../pages/ManageChannelsPage"
+import { ManageUsersPage } from "../pages/ManageUsersPage"
 import { MessageFormPage } from "../pages/MessageFormPage"
 import { AuthLayout } from "../components/layouts/AuthLayout"
 import { AuthGuard } from "./guards/AuthGuard"
@@ -22,6 +23,7 @@ function App() {
         <Route element={<DashboardLayout />}>
           <Route index element={<DashboardPage />} />
           <Route path="manage-channels" element={<ManageChannelsPage />} />
+          <Route path="manage-users" element={<ManageUsersPage />} />
           <Route path="create-campaign" element={<CreateCampaignPage />} />
           <Route path="manage-campaign/:campaignId" element={<ManageCampaignPage />} />
           <Route path="message-form" element={<MessageFormPage />} />

@@ -1,3 +1,4 @@
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "../ui/Button";
 
 type Props = {
@@ -11,10 +12,10 @@ export function MessagePagination({ canGoPrev, canGoNext, onPrev, onNext }: Prop
   return (
     <div className="u-flex u-gap-1" style={{ marginTop: "1rem" }}>
       <Button variant="secondary" size="small" disabled={!canGoPrev} onClick={onPrev}>
-        ← Anterior
+        <ChevronLeft /> Anterior
       </Button>
       <Button variant="secondary" size="small" disabled={!canGoNext} onClick={onNext}>
-        Siguiente →
+        Siguiente <ChevronRight />
       </Button>
     </div>
   );

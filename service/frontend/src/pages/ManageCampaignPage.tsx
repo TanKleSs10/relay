@@ -17,6 +17,7 @@ import {
   useMessages,
   useRetryCampaign,
 } from "../features";
+import { MoveLeft } from "lucide-react";
 
 export function ManageCampaignPage() {
   const { campaignId } = useParams();
@@ -89,7 +90,7 @@ export function ManageCampaignPage() {
     <>
       <section className="actions">
         <Link to="/" className="btn btn--secondary">
-          ← Volver al Panel
+          <MoveLeft /> Volver al Panel
         </Link>
       </section>
       <CampaignSummary

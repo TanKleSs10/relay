@@ -24,13 +24,13 @@ export function MessageTable({ campaignId, messages, isLoading, onDelete }: Prop
   if (messages.length === 0) {
     return <EmptyState icon="📭" title="Sin Mensajes" />;
   }
-
   return (
     <div className="u-w-100" style={{ overflowX: "auto" }}>
       <table className="table">
         <thead>
           <tr>
             <th>ID</th>
+            <th>ID Externo</th>
             <th>Para</th>
             <th>Mensaje</th>
             <th>Estado</th>
@@ -40,7 +40,8 @@ export function MessageTable({ campaignId, messages, isLoading, onDelete }: Prop
         <tbody>
           {messages.map((msg) => (
             <tr key={msg.id}>
-              <td>{msg.id}</td>
+              <td>{msg.id.slice(0, 7)}</td>
+              <td>{msg.external_id ?? "-"}</td>
               <td>{msg.recipient}</td>
               <td>{msg.content}</td>
               <td>{msg.status}</td>
