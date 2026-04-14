@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 
 import { Button } from "../ui/Button";
+import { StatusBadge } from "../ui/StatusBadge";
 
 type Props = {
   id: string;
@@ -43,9 +44,10 @@ export function CampaignCard({
           </div>
           <div className="campaign-card__meta-item">
             <span className="campaign-card__meta-label">Estado</span>
-            <span className={`campaign-card__status ${statusClassName}`}>
-              {statusLabel}
-            </span>
+            <StatusBadge
+              label={statusLabel}
+              className={`campaign-card__status ${statusClassName}`}
+            />
           </div>
         </div>
       </div>

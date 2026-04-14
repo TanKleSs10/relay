@@ -1,5 +1,6 @@
 import { Button } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
+import { StatusBadge } from "../ui/StatusBadge";
 import type { SenderAccount } from "../../schemas";
 
 const senderStatusLabels: Record<string, string> = {
@@ -41,16 +42,20 @@ export function ChannelList({ channels, onViewQr, onResetSession, onDelete }: Pr
         return (
           <article key={sender.id} className="channel-row">
             <div className="channel-row__main">
-              <p className="channel-row__title">Canal #{sender.id}</p>
+              <div className="channel-row__header">
+                <p className="channel-row__title">{sender.label}</p>
+                <Button size="small" variant="primary">editar</Button>
+              </div>
               <div className="channel-row__meta">
                 <span className="channel-row__meta-item">
-                  {sender.label} · Teléfono: <strong>{sender.phone_number || "-"}</strong>
+                  #{sender.id.slice(0, 6)} · Teléfono: <strong>{sender.phone_number || "-"}</strong>
                 </span>
                 <span className="channel-row__meta-item">
                   Estado:{" "}
-                  <span className={`channel-status ${statusClass}`}>
-                    {senderStatusLabels[sender.status] || sender.status}
-                  </span>
+                  <StatusBadge
+                    label={senderStatusLabels[sender.status] || sender.status}
+                    className={`channel-status ${statusClass}`}
+                  />
                 </span>
               </div>
             </div>
