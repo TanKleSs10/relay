@@ -8,5 +8,6 @@ export type AuthUser = {
   email: string;
   username: string;
   status: string;
+  roles: string[];
   created_at: string;
 };

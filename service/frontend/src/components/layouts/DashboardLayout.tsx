@@ -11,6 +11,7 @@ export function DashboardLayout() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const displayName = user?.username || user?.email || "Usuario";
+  const roleLabel = user?.roles?.[0] ? `(${user.roles[0]})` : "";
 
   return (
     <div>
@@ -18,7 +19,9 @@ export function DashboardLayout() {
         <div className="header__container">
           <h1 className="header__title">⚡ Relay</h1>
           <div className="header__user">
-            <span className="header__user-name">{displayName.toLocaleUpperCase()}</span>
+            <span className="header__user-name">
+              {displayName.toLocaleUpperCase()} {roleLabel}
+            </span>
             <button
               type="button"
               className="btn btn--danger btn--small"
