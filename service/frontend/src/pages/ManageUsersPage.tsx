@@ -9,6 +9,7 @@ import { Spinner } from "../components/ui/Spinner";
 import { UserCreateModal } from "../components/manage-users/UserCreateModal";
 import { UserTable } from "../components/manage-users/UserTable";
 import { useCreateUser, useUpdateUserStatus, useUsers } from "../features";
+import { ArrowLeft, UserRoundPlus } from "lucide-react";
 
 export function ManageUsersPage() {
   const queryClient = useQueryClient();
@@ -33,10 +34,10 @@ export function ManageUsersPage() {
       <section className="actions">
         <div className="actions__group">
           <Link to="/" className="btn btn--secondary">
-            ← Volver al Panel
+            <ArrowLeft /> Volver al Panel
           </Link>
           <Button variant="primary" onClick={() => setIsCreateOpen(true)}>
-            ➕ Crear Usuario
+            <UserRoundPlus /> Crear Usuario
           </Button>
         </div>
       </section>
@@ -98,4 +99,3 @@ export function ManageUsersPage() {
     </>
   );
 }
-

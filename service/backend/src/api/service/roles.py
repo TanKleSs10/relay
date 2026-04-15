@@ -1,6 +1,5 @@
 from sqlalchemy.orm import Session, joinedload
 from uuid import UUID
-
 from src.domain import Role
 from src.domain.models import RolePermission
 

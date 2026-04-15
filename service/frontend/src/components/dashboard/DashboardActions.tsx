@@ -1,4 +1,4 @@
-import { Cog, FilePlusCorner, MessageCirclePlus, Users } from "lucide-react";
+import { FilePlusCorner, MessageCirclePlus, Users } from "lucide-react";
 import { Link } from "react-router";
 
 type Props = {
