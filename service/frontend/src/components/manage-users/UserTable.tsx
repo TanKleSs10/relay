@@ -2,6 +2,8 @@ import { Button } from "../ui/Button";
 import { StatusBadge } from "../ui/StatusBadge";
 import type { User } from "../../schemas";
 
+const SUPERADMIN_EMAIL = "admin@relay.com";
+
 type Props = {
   users: User[];
   onToggleStatus: (userId: string, nextStatus: "ACTIVE" | "INACTIVE") => void;
@@ -18,6 +20,7 @@ export function UserTable({ users, onToggleStatus, onEdit, onDelete }: Props) {
             <th>ID</th>
             <th>Email</th>
             <th>Username</th>
+            <th>Rol</th>
             <th>Status</th>
             <th>Acciones</th>
           </tr>
@@ -28,11 +31,14 @@ export function UserTable({ users, onToggleStatus, onEdit, onDelete }: Props) {
               user.status === "ACTIVE"
                 ? "campaign-card__status campaign-card__status--processing"
                 : "campaign-card__status campaign-card__status--failed";
+            const primaryRole = user.roles[0]?.toLowerCase() ?? "sin rol";
+            const isProtectedAdmin = user.email.trim().toLowerCase() === SUPERADMIN_EMAIL;
             return (
               <tr key={user.id}>
                 <td>{user.id.slice(0, 7)}</td>
                 <td>{user.email}</td>
-                <td>{user.username}</td>
+                <td>{user.username.toLowerCase()}</td>
+                <td>{primaryRole}</td>
                 <td>
                   <StatusBadge label={user.status} className={badgeClass} />
                 </td>
@@ -45,14 +51,26 @@ export function UserTable({ users, onToggleStatus, onEdit, onDelete }: Props) {
                       size="small"
                       variant="danger"
                       onClick={() => onDelete(user)}
-                      disabled={user.status === "INACTIVE"}
-                      title={user.status === "INACTIVE" ? "Usuario ya desactivado" : "Desactivar usuario"}
+                      disabled={user.status === "INACTIVE" || isProtectedAdmin}
+                      title={
+                        isProtectedAdmin
+                          ? "El admin principal no se puede eliminar"
+                          : user.status === "INACTIVE"
+                            ? "Usuario ya desactivado"
+                            : "Desactivar usuario"
+                      }
                     >
                       Eliminar
                     </Button>
                     <Button
                       size="small"
                       variant="secondary"
+                      disabled={isProtectedAdmin && user.status === "ACTIVE"}
+                      title={
+                        isProtectedAdmin && user.status === "ACTIVE"
+                          ? "El admin principal no se puede desactivar"
+                          : undefined
+                      }
                       onClick={() =>
                         onToggleStatus(user.id, user.status === "ACTIVE" ? "INACTIVE" : "ACTIVE")
                       }
