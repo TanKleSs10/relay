@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 
 import {
   deleteCampaign,
+  downloadCampaignMessagesReport,
   dispatchCampaign,
   getCampaign,
   getCampaignMetrics,
@@ -62,4 +63,9 @@ export const useRetryCampaign = () =>
 export const useUploadCampaign = () =>
   useMutation({
     mutationFn: (formData: FormData) => uploadCampaign(formData),
+  });
+
+export const useDownloadCampaignMessagesReport = () =>
+  useMutation({
+    mutationFn: (campaignId: string) => downloadCampaignMessagesReport(campaignId),
   });

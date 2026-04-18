@@ -24,6 +24,8 @@ type Props = {
   onPause: (campaignId: string) => void;
   onRetry: (campaignId: string) => void;
   onDelete: (campaignId: string) => void;
+  onDownload: (campaignId: string) => void;
+  downloadingCampaignId?: string | null;
 };
 
 export function CampaignGrid({
@@ -34,6 +36,8 @@ export function CampaignGrid({
   onPause,
   onRetry,
   onDelete,
+  onDownload,
+  downloadingCampaignId,
 }: Props) {
   const hasCampaigns = campaigns.length > 0;
 
@@ -64,6 +68,8 @@ export function CampaignGrid({
                 onPause={() => onPause(campaign.id)}
                 onRetry={() => onRetry(campaign.id)}
                 onDelete={() => onDelete(campaign.id)}
+                onDownload={() => onDownload(campaign.id)}
+                isDownloading={downloadingCampaignId === campaign.id}
               />
             );
           })

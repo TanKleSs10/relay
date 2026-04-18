@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 
@@ -6,6 +6,7 @@ import { CampaignGrid } from "../components/dashboard/CampaignGrid";
 import { DashboardActions } from "../components/dashboard/DashboardActions";
 import {
   useCampaigns,
+  useDownloadCampaignMessagesReport,
   useDeleteCampaign,
   useDispatchCampaign,
   useEnumIndex,
@@ -41,6 +42,8 @@ export function DashboardPage() {
   const dispatchCampaign = useDispatchCampaign();
   const pauseCampaign = usePauseCampaign();
   const retryCampaign = useRetryCampaign();
+  const downloadCampaignReport = useDownloadCampaignMessagesReport();
+  const [downloadingCampaignId, setDownloadingCampaignId] = useState<string | null>(null);
   const isAdmin = (user?.roles ?? []).includes("ADMIN");
 
   const statusTranslator = useMemo(() => buildCampaignStatusTranslator(enumIndex), [enumIndex]);
@@ -58,6 +61,17 @@ export function DashboardPage() {
       return "No hay senders disponibles";
     }
     return message || "Error al despachar campaña";
+  };
+
+  const startCsvDownload = (blob: Blob, filename: string) => {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
   };
 
   return (
@@ -115,6 +129,24 @@ export function DashboardPage() {
             },
           })
         }
+        onDownload={(campaignId) => {
+          setDownloadingCampaignId(campaignId);
+          downloadCampaignReport.mutate(campaignId, {
+            onSuccess: ({ blob, filename }) => {
+              startCsvDownload(blob, filename || `campaign-${campaignId}-messages.csv`);
+              toast.success("Reporte descargado");
+            },
+            onError: (error) => {
+              toast.error(
+                error instanceof Error ? error.message : "No se pudo descargar el reporte"
+              );
+            },
+            onSettled: () => {
+              setDownloadingCampaignId(null);
+            },
+          });
+        }}
+        downloadingCampaignId={downloadingCampaignId}
       />
     </>
   );

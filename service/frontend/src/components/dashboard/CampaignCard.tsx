@@ -14,6 +14,8 @@ type Props = {
   onPause: () => void;
   onRetry: () => void;
   onDelete: () => void;
+  onDownload: () => void;
+  isDownloading?: boolean;
 };
 
 export function CampaignCard({
@@ -27,6 +29,8 @@ export function CampaignCard({
   onPause,
   onRetry,
   onDelete,
+  onDownload,
+  isDownloading = false,
 }: Props) {
   const isPaused = status === "PAUSED";
   const isActive = status === "ACTIVE";
@@ -77,6 +81,14 @@ export function CampaignCard({
             Reanudar
           </Button>
         ) : null}
+        <Button
+          variant="ghost"
+          className="campaign-card__button u-w-100 u-mb-2"
+          onClick={onDownload}
+          disabled={isDownloading}
+        >
+          {isDownloading ? "Descargando..." : "Descargar CSV"}
+        </Button>
         <div className="u-flex u-gap-1">
           <Link to={`/manage-campaign/${id}`} className="campaign-card__button btn btn--primary">
             Gestionar

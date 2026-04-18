@@ -1,4 +1,4 @@
-import { request } from "../../../api";
+import { downloadFile, request } from "../../../api";
 import type { Campaign, CampaignMetrics, CampaignUploadSummary } from "../campaign.types";
 
 export function listCampaigns() {
@@ -35,4 +35,8 @@ export function uploadCampaign(formData: FormData) {
     headers: {},
     body: formData,
   });
+}
+
+export function downloadCampaignMessagesReport(campaignId: string) {
+  return downloadFile(`/reports/campaigns/${campaignId}/messages.csv`);
 }
