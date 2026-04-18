@@ -3,7 +3,13 @@ from uuid import UUID
 from sqlalchemy.orm import Session, selectinload
 
 from src.application.errors import ConflictError, NotFoundError
+from src.config import get_settings
 from src.domain.models import Role, User, UserRole, UserStatus
+
+
+def _is_protected_superuser(user: User) -> bool:
+    settings = get_settings()
+    return user.email.strip().lower() == settings.superuser_email.strip().lower()
 
 
 def get_user_by_email(db: Session, email: str) -> User:
@@ -89,6 +95,8 @@ def change_user_status(db: Session, user_id: UUID, new_status: UserStatus) -> Us
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise NotFoundError("User not found")
+    if _is_protected_superuser(user) and new_status == UserStatus.INACTIVE:
+        raise ConflictError("Superadmin cannot be deactivated")
     user.status = new_status
     return user
 
@@ -118,5 +126,7 @@ def deactivate_user(db: Session, user_id: UUID) -> User:
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise NotFoundError("User not found")
+    if _is_protected_superuser(user):
+        raise ConflictError("Superadmin cannot be deleted")
     user.status = UserStatus.INACTIVE
     return user
