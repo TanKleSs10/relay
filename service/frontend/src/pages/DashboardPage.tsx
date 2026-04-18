@@ -9,6 +9,7 @@ import {
   useDeleteCampaign,
   useDispatchCampaign,
   useEnumIndex,
+  useMe,
   usePauseCampaign,
   useRetryCampaign,
   useSenderAccounts,
@@ -33,12 +34,14 @@ function buildCampaignStatusTranslator(enumIndex?: { enums?: Record<string, stri
 export function DashboardPage() {
   const queryClient = useQueryClient();
   const { data: enumIndex } = useEnumIndex();
+  const { data: user } = useMe();
   const { data: campaigns = [], isLoading } = useCampaigns();
   const { data: senders = [] } = useSenderAccounts();
   const deleteCampaign = useDeleteCampaign();
   const dispatchCampaign = useDispatchCampaign();
   const pauseCampaign = usePauseCampaign();
   const retryCampaign = useRetryCampaign();
+  const isAdmin = (user?.roles ?? []).includes("ADMIN");
 
   const statusTranslator = useMemo(() => buildCampaignStatusTranslator(enumIndex), [enumIndex]);
   const connectedSenders = useMemo(
@@ -62,6 +65,7 @@ export function DashboardPage() {
       <DashboardActions
         connectedSenders={connectedSenders}
         sendingSenders={sendingSenders}
+        isAdmin={isAdmin}
       />
       <CampaignGrid
         campaigns={campaigns}

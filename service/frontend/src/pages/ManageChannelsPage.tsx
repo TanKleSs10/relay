@@ -12,6 +12,7 @@ import { Modal } from "../components/ui/Modal";
 import {
   useCreateSenderAccount,
   useDeleteSenderAccount,
+  useMe,
   useResetSenderSession,
   useSenderAccounts,
   useSenderQr,
@@ -33,6 +34,8 @@ export function ManageChannelsPage() {
   const [qrModalSender, setQrModalSender] = useState<SenderAccount | null>(null);
   const qrSenderId = qrModalSender?.id ?? "";
   const { data: qrData } = useSenderQr(qrSenderId, Boolean(qrModalSender));
+  const { data: user } = useMe();
+  const isAdmin = (user?.roles ?? []).includes("ADMIN");
 
   const modalSender = qrModalSender
     ? channels.find((item) => item.id === qrModalSender.id) || qrModalSender
@@ -42,9 +45,11 @@ export function ManageChannelsPage() {
     <>
       <section className="actions">
         <div className="actions__group">
-          <Link to="/" className="btn btn--secondary">
-            <ArrowLeft /> Volver al Panel
-          </Link>
+          {isAdmin && (
+            <Link to="/" className="btn btn--secondary">
+              <ArrowLeft /> Volver al Panel
+            </Link>
+          )}
           <Button
             variant="primary"
             onClick={() =>

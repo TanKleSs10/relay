@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
-import { createUser, listUsers, updateUserStatus } from "../api/user.api";
-import type { UserCreatePayload, UserStatusUpdatePayload } from "../user.types";
+import { createUser, deleteUser, listUsers, updateUser, updateUserStatus } from "../api/user.api";
+import type { UserCreatePayload, UserStatusUpdatePayload, UserUpdatePayload } from "../user.types";
 
 export const userKeys = {
   all: ["users"] as const,
@@ -31,3 +31,18 @@ export const useUpdateUserStatus = () =>
     }) => updateUserStatus(userId, payload),
   });
 
+export const useUpdateUser = () =>
+  useMutation({
+    mutationFn: ({
+      userId,
+      payload,
+    }: {
+      userId: string;
+      payload: UserUpdatePayload;
+    }) => updateUser(userId, payload),
+  });
+
+export const useDeleteUser = () =>
+  useMutation({
+    mutationFn: (userId: string) => deleteUser(userId),
+  });

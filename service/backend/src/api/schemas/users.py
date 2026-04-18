@@ -55,3 +55,8 @@ class UserRead(APIModel):
 
 class UserStatusUpdate(APIModel):
     status: UserStatus
+
+
+class UserUpdate(APIModel):
+    username: str | None = Field(default=None, min_length=3, max_length=80)
+    email: EmailStr | None = None

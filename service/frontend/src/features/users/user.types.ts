@@ -13,3 +13,7 @@ export type UserStatusUpdatePayload = {
   status: "ACTIVE" | "INACTIVE";
 };
 
+export type UserUpdatePayload = {
+  email?: string;
+  username?: string;
+};

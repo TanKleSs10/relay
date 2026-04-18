@@ -5,9 +5,11 @@ import type { User } from "../../schemas";
 type Props = {
   users: User[];
   onToggleStatus: (userId: string, nextStatus: "ACTIVE" | "INACTIVE") => void;
+  onEdit: (user: User) => void;
+  onDelete: (user: User) => void;
 };
 
-export function UserTable({ users, onToggleStatus }: Props) {
+export function UserTable({ users, onToggleStatus, onEdit, onDelete }: Props) {
   return (
     <div className="u-w-100" style={{ overflowX: "auto" }}>
       <table className="table">
@@ -35,15 +37,29 @@ export function UserTable({ users, onToggleStatus }: Props) {
                   <StatusBadge label={user.status} className={badgeClass} />
                 </td>
                 <td>
-                  <Button
-                    size="small"
-                    variant="secondary"
-                    onClick={() =>
-                      onToggleStatus(user.id, user.status === "ACTIVE" ? "INACTIVE" : "ACTIVE")
-                    }
-                  >
-                    {user.status === "ACTIVE" ? "Desactivar" : "Activar"}
-                  </Button>
+                  <div className="u-flex u-gap-1" style={{ flexWrap: "wrap" }}>
+                    <Button size="small" variant="ghost" onClick={() => onEdit(user)}>
+                      Editar
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="danger"
+                      onClick={() => onDelete(user)}
+                      disabled={user.status === "INACTIVE"}
+                      title={user.status === "INACTIVE" ? "Usuario ya desactivado" : "Desactivar usuario"}
+                    >
+                      Eliminar
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="secondary"
+                      onClick={() =>
+                        onToggleStatus(user.id, user.status === "ACTIVE" ? "INACTIVE" : "ACTIVE")
+                      }
+                    >
+                      {user.status === "ACTIVE" ? "Desactivar" : "Activar"}
+                    </Button>
+                  </div>
                 </td>
               </tr>
             );
@@ -53,4 +69,3 @@ export function UserTable({ users, onToggleStatus }: Props) {
     </div>
   );
 }
-

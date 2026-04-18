@@ -1,5 +1,5 @@
 import { request } from "../../../api";
-import type { User, UserCreatePayload, UserStatusUpdatePayload } from "../user.types";
+import type { User, UserCreatePayload, UserStatusUpdatePayload, UserUpdatePayload } from "../user.types";
 
 export function listUsers(params: { skip?: number; limit?: number } = {}) {
   const searchParams = new URLSearchParams();
@@ -17,3 +17,10 @@ export function updateUserStatus(userId: string, payload: UserStatusUpdatePayloa
   return request<User>(`/users/${userId}/status`, { method: "PATCH", body: payload });
 }
 
+export function updateUser(userId: string, payload: UserUpdatePayload) {
+  return request<User>(`/users/${userId}`, { method: "PATCH", body: payload });
+}
+
+export function deleteUser(userId: string) {
+  return request<User>(`/users/${userId}`, { method: "DELETE" });
+}

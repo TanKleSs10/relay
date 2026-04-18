@@ -91,3 +91,32 @@ def change_user_status(db: Session, user_id: UUID, new_status: UserStatus) -> Us
         raise NotFoundError("User not found")
     user.status = new_status
     return user
+
+
+def update_user(db: Session, user_id: UUID, username: str | None, email: str | None) -> User:
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise NotFoundError("User not found")
+
+    if username and username != user.username:
+        found_username = db.query(User).filter(User.username == username).first()
+        if found_username:
+            raise ConflictError("Username already exists")
+        user.username = username
+
+    if email and email != user.email:
+        found_email = db.query(User).filter(User.email == email).first()
+        if found_email:
+            raise ConflictError("Email already exists")
+        user.email = email
+
+    return user
+
+
+def deactivate_user(db: Session, user_id: UUID) -> User:
+    # MVP-safe "delete": keep the row to avoid FK issues (campaigns/messages ownership).
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise NotFoundError("User not found")
+    user.status = UserStatus.INACTIVE
+    return user

@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Spinner } from "../components/ui/Spinner";
@@ -90,6 +89,7 @@ export function ManageUsersPage() {
               closeCreate();
             },
             onError: (error) => {
+              console.error("Error creating user:", error);
               toast.error(error instanceof Error ? error.message : "No se pudo crear usuario");
             },
           });
