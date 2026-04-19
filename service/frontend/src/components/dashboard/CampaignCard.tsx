@@ -82,7 +82,7 @@ export function CampaignCard({
           </Button>
         ) : null}
         <Button
-          variant="ghost"
+          variant="secondary"
           className="campaign-card__button u-w-100 u-mb-2"
           onClick={onDownload}
           disabled={isDownloading}
