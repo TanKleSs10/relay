@@ -3,11 +3,13 @@ import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 
-import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Spinner } from "../components/ui/Spinner";
-import { CampaignMetricsPanel } from "../components/campaign/CampaignMetricsPanel";
-import type { Message } from "../schemas";
+import { CampaignActions } from "../components/manage-campaign/CampaignActions";
+import { CampaignSummary } from "../components/manage-campaign/CampaignSummary";
+import { MessageFilters } from "../components/manage-campaign/MessageFilters";
+import { MessagePagination } from "../components/manage-campaign/MessagePagination";
+import { MessageTable } from "../components/manage-campaign/MessageTable";
 import {
   useCampaign,
   useDeleteCampaign,
@@ -15,12 +17,13 @@ import {
   useMessages,
   useRetryCampaign,
 } from "../features";
+import { ArrowLeft } from "lucide-react";
 
 export function ManageCampaignPage() {
   const { campaignId } = useParams();
   const queryClient = useQueryClient();
-  const campaignIdNumber = campaignId ? Number(campaignId) : NaN;
-  const { data: campaign, isLoading } = useCampaign(campaignIdNumber);
+  const campaignIdValue = campaignId ?? "";
+  const { data: campaign, isLoading } = useCampaign(campaignIdValue);
   const deleteCampaign = useDeleteCampaign();
   const deleteMessage = useDeleteMessage();
   const retryCampaign = useRetryCampaign();
@@ -28,7 +31,7 @@ export function ManageCampaignPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const pageSize = 25;
   const { data: messagesData, isLoading: isLoadingMessages } = useMessages({
-    campaignId: campaignIdNumber,
+    campaignId: campaignIdValue,
     page,
     limit: pageSize,
     status: statusFilter === "all" ? undefined : statusFilter,
@@ -55,7 +58,7 @@ export function ManageCampaignPage() {
     return message || "No se pudo reintentar";
   };
 
-  if (!campaignId || Number.isNaN(campaignIdNumber)) {
+  if (!campaignIdValue) {
     return (
       <EmptyState
         icon="⚠️"
@@ -87,166 +90,83 @@ export function ManageCampaignPage() {
     <>
       <section className="actions">
         <Link to="/" className="btn btn--secondary">
-          ← Volver al Panel
+          <ArrowLeft /> Volver al Panel
         </Link>
       </section>
-      <section className="campaign-detail">
-        <h2 className="campaigns__title">Gestionar: {campaign.name}</h2>
-        <div style={{ marginBottom: "2rem" }}>
-          <p style={{ marginBottom: "0.5rem" }}>
-            <strong>Estado:</strong> {campaign.status}
-          </p>
-          <p style={{ marginBottom: "0.5rem" }}>
-            <strong>Mensajes (página):</strong> {messageCountLabel}
-          </p>
-        </div>
-        <CampaignMetricsPanel campaignId={campaign.id} />
-        <div className="actions__group" style={{ marginBottom: "2rem" }}>
-          {campaign.status === "PAUSED" ? (
-            <Button
-              variant="secondary"
-              onClick={() =>
-                retryCampaign.mutate(campaign.id, {
-                  onSuccess: () => {
-                    queryClient.invalidateQueries({ queryKey: ["campaigns"] });
-                    queryClient.invalidateQueries({
-                      queryKey: ["messages", "list"],
-                    });
-                    toast.success("Mensajes fallidos reintentados");
-                  },
-                  onError: (error) => {
-                    toast.error(formatCampaignError(error));
-                  },
-                })
-              }
-            >
-              Reintentar fallidos
-            </Button>
-          ) : null}
-          <Button
-            variant="danger"
-            onClick={() =>
-              deleteCampaign.mutate(campaign.id, {
-                onSuccess: () => {
-                  queryClient.invalidateQueries({ queryKey: ["campaigns"] });
-                  toast.success("Campaña eliminada");
-                },
-                onError: () => {
-                  toast.error("No se pudo eliminar la campaña");
-                },
-              })
-            }
-          >
-            Eliminar Campaña
-          </Button>
-        </div>
-        <h3 className="campaigns__title">Mensajes</h3>
-        <div className="u-flex u-gap-1 filter-row" style={{ marginBottom: "1rem" }}>
-          <label htmlFor="status-filter" className="filter-label">
-            Filtrar por estado:
-          </label>
-          <select
-            id="status-filter"
-            className="filter-select"
-            value={statusFilter}
-            onChange={(event) => {
-              setPage(1);
-              setStatusFilter(event.target.value);
-            }}
-          >
-            {statusOptions.map((option) => (
-              <option key={option} value={option}>
-                {option === "all" ? "Todos" : option}
-              </option>
-            ))}
-          </select>
-        </div>
-        {isLoadingMessages ? (
-          <div className="empty-state">
-            <Spinner label="Cargando mensajes..." />
-          </div>
-        ) : messages.length === 0 ? (
-          <EmptyState icon="📭" title="Sin Mensajes" />
-        ) : (
-          <>
-            <div className="u-w-100" style={{ overflowX: "auto" }}>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Para</th>
-                    <th>Mensaje</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {messages.map((msg: Message) => (
-                    <tr key={msg.id}>
-                      <td>{msg.id}</td>
-                      <td>{msg.recipient}</td>
-                      <td>{msg.content}</td>
-                      <td>{msg.status}</td>
-                      <td>
-                        <div className="u-flex u-gap-1 u-flex-center">
-                          <Link
-                            className="btn btn--primary btn--small"
-                            to={`/message-form?campaign=${campaign.id}&message=${msg.id}`}
-                          >
-                            Editar
-                          </Link>
-                          <Button
-                            variant="danger"
-                            size="small"
-                            onClick={() =>
-                              deleteMessage.mutate(msg.id, {
-                                onSuccess: () => {
-                                queryClient.invalidateQueries({
-                                  queryKey: ["messages", "list"],
-                                });
-                                  toast.success("Mensaje eliminado");
-                                },
-                                onError: () => {
-                                  toast.error("No se pudo eliminar el mensaje");
-                                },
-                              })
-                            }
-                          >
-                            Eliminar
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="u-flex u-gap-1" style={{ marginTop: "1rem" }}>
-              <Button
-                variant="secondary"
-                size="small"
-                disabled={!canGoPrev}
-                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-              >
-                ← Anterior
-              </Button>
-              <Button
-                variant="secondary"
-                size="small"
-                disabled={!canGoNext}
-                onClick={() => setPage((prev) => prev + 1)}
-              >
-                Siguiente →
-              </Button>
-            </div>
-          </>
-        )}
-        <div style={{ marginTop: "2rem" }}>
-          <Link className="btn btn--success" to={`/message-form?campaign=${campaign.id}`}>
-            Agregar Mensaje
-          </Link>
-        </div>
-      </section>
+      <CampaignSummary
+        campaignId={campaign.id}
+        name={campaign.name}
+        status={campaign.status}
+        messageCountLabel={messageCountLabel}
+      />
+      <CampaignActions
+        status={campaign.status}
+        onRetry={() =>
+          retryCampaign.mutate(campaign.id, {
+            onSuccess: () => {
+              queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+              queryClient.invalidateQueries({
+                queryKey: ["messages", "list"],
+              });
+              toast.success("Mensajes fallidos reintentados");
+            },
+            onError: (error) => {
+              toast.error(formatCampaignError(error));
+            },
+          })
+        }
+        onDelete={() =>
+          deleteCampaign.mutate(campaign.id, {
+            onSuccess: () => {
+              queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+              toast.success("Campaña eliminada");
+            },
+            onError: () => {
+              toast.error("No se pudo eliminar la campaña");
+            },
+          })
+        }
+      />
+      <h3 className="campaigns__title">Mensajes</h3>
+      <MessageFilters
+        value={statusFilter}
+        options={statusOptions}
+        onChange={(value) => {
+          setPage(1);
+          setStatusFilter(value);
+        }}
+      />
+      <MessageTable
+        campaignId={campaign.id}
+        messages={messages}
+        isLoading={isLoadingMessages}
+        onDelete={(messageId) =>
+          deleteMessage.mutate(messageId, {
+            onSuccess: () => {
+              queryClient.invalidateQueries({
+                queryKey: ["messages", "list"],
+              });
+              toast.success("Mensaje eliminado");
+            },
+            onError: () => {
+              toast.error("No se pudo eliminar el mensaje");
+            },
+          })
+        }
+      />
+      {messages.length > 0 ? (
+        <MessagePagination
+          canGoPrev={canGoPrev}
+          canGoNext={canGoNext}
+          onPrev={() => setPage((prev) => Math.max(1, prev - 1))}
+          onNext={() => setPage((prev) => prev + 1)}
+        />
+      ) : null}
+      <div style={{ marginTop: "2rem" }}>
+        <Link className="btn btn--success" to={`/message-form?campaign=${campaign.id}`}>
+          Agregar Mensaje
+        </Link>
+      </div>
     </>
   );
 }

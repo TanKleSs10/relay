@@ -1,142 +1,62 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-
 import { Button } from "../components/ui/Button";
-import { EmptyState } from "../components/ui/EmptyState";
 import { Spinner } from "../components/ui/Spinner";
+import { ChannelList } from "../components/manage-channels/ChannelList";
+import { ChannelCreateModal } from "../components/manage-channels/ChannelCreateModal";
+import { ChannelEditModal } from "../components/manage-channels/ChannelEditModal";
 import type { SenderAccount } from "../schemas";
+import { Modal } from "../components/ui/Modal";
 import {
   useCreateSenderAccount,
   useDeleteSenderAccount,
+  useMe,
   useResetSenderSession,
   useSenderAccounts,
+  useSenderQr,
+  useUpdateSenderAccount,
 } from "../features";
-
-const senderStatusLabels: Record<string, string> = {
-  CREATED: "Creado",
-  INITIALIZING: "Inicializando",
-  WAITING_QR: "Esperando QR",
-  CONNECTED: "Conectado",
-  SENDING: "Enviando",
-  COOLDOWN: "En enfriamiento",
-  DISCONNECTED: "Desconectado",
-  BLOCKED: "Bloqueado",
-  ERROR: "Error",
-};
+import { ArrowLeft, CirclePlus } from "lucide-react";
 
 export function ManageChannelsPage() {
   const queryClient = useQueryClient();
   const { data: channels = [], isLoading } = useSenderAccounts();
   const createSender = useCreateSenderAccount();
+  const updateSender = useUpdateSenderAccount();
   const deleteSender = useDeleteSenderAccount();
   const resetSession = useResetSenderSession();
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const [editSender, setEditSender] = useState<SenderAccount | null>(null);
+  const [editLabel, setEditLabel] = useState("");
   const [qrModalSender, setQrModalSender] = useState<SenderAccount | null>(null);
+  const qrSenderId = qrModalSender?.id ?? "";
+  const { data: qrData } = useSenderQr(qrSenderId, Boolean(qrModalSender));
+  const { data: user } = useMe();
+  const isAdmin = (user?.roles ?? []).includes("ADMIN");
 
   const modalSender = qrModalSender
     ? channels.find((item) => item.id === qrModalSender.id) || qrModalSender
     : null;
 
-  const channelsList = useMemo(() => {
-    if (channels.length === 0) {
-      return (
-        <EmptyState
-          icon="📡"
-          title="Sin Canales"
-          description="No hay canales creados todavía."
-        />
-      );
-    }
-
-    return channels.map((sender) => {
-      const statusClass = `channel-status--${String(sender.status || "")
-        .toLowerCase()
-        .replace("_", "-")}`;
-      return (
-        <article key={sender.id} className="channel-row">
-          <div className="channel-row__main">
-            <p className="channel-row__title">Canal #{sender.id}</p>
-            <div className="channel-row__meta">
-              <span className="channel-row__meta-item">
-                Teléfono: <strong>{sender.phone_number || "-"}</strong>
-              </span>
-              <span className="channel-row__meta-item">
-                Estado: <span className={`channel-status ${statusClass}`}>{senderStatusLabels[sender.status] || sender.status}</span>
-              </span>
-            </div>
-          </div>
-            <div className="channel-row__actions">
-            <Button
-              size="small"
-              variant="tertiary"
-              disabled={!sender.qr_code}
-              onClick={() => setQrModalSender(sender)}
-            >
-              Ver QR
-            </Button>
-            <Button
-              size="small"
-              variant="secondary"
-              onClick={() =>
-                resetSession.mutate(sender.id, {
-                  onSuccess: () => {
-                    queryClient.invalidateQueries({ queryKey: ["sender-accounts"] });
-                    toast.success("Sesión reiniciada");
-                  },
-                  onError: () => {
-                    toast.error("No se pudo reiniciar la sesión");
-                  },
-                })
-              }
-            >
-              Reset sesión
-            </Button>
-            <Button
-              size="small"
-              variant="danger"
-              onClick={() =>
-                deleteSender.mutate(sender.id, {
-                  onSuccess: () => {
-                    queryClient.invalidateQueries({ queryKey: ["sender-accounts"] });
-                    toast.success("Canal eliminado");
-                  },
-                  onError: () => {
-                    toast.error("No se pudo eliminar el canal");
-                  },
-                })
-              }
-            >
-              Eliminar
-            </Button>
-          </div>
-        </article>
-      );
-    });
-  }, [channels]);
-
   return (
     <>
       <section className="actions">
         <div className="actions__group">
-          <Link to="/" className="btn btn--secondary">
-            ← Volver al Panel
-          </Link>
+          {isAdmin && (
+            <Link to="/" className="btn btn--secondary">
+              <ArrowLeft /> Volver al Panel
+            </Link>
+          )}
           <Button
             variant="primary"
             onClick={() =>
-              createSender.mutate(undefined, {
-                onSuccess: () => {
-                  queryClient.invalidateQueries({ queryKey: ["sender-accounts"] });
-                  toast.success("Canal creado");
-                },
-                onError: () => {
-                  toast.error("No se pudo crear el canal");
-                },
-              })
+              setIsCreateOpen(true)
             }
           >
-            ➕ Crear Canal
+            <CirclePlus /> Crear Canal
           </Button>
         </div>
       </section>
@@ -149,28 +69,52 @@ export function ManageChannelsPage() {
               <Spinner label="Cargando canales..." />
             </div>
           ) : (
-            channelsList
+            <ChannelList
+              channels={channels}
+              onViewQr={(sender) => setQrModalSender(sender)}
+              onEdit={(sender) => {
+                setEditSender(sender);
+                setEditLabel(sender.label);
+              }}
+              onResetSession={(senderId) =>
+                resetSession.mutate(senderId, {
+                  onSuccess: () => {
+                    queryClient.invalidateQueries({ queryKey: ["sender-accounts"] });
+                    toast.success("Sesión reiniciada");
+                  },
+                  onError: () => {
+                    toast.error("No se pudo reiniciar la sesión");
+                  },
+                })
+              }
+              onDelete={(senderId) =>
+                deleteSender.mutate(senderId, {
+                  onSuccess: () => {
+                    queryClient.invalidateQueries({ queryKey: ["sender-accounts"] });
+                    toast.success("Canal eliminado");
+                  },
+                  onError: () => {
+                    toast.error("No se pudo eliminar el canal");
+                  },
+                })
+              }
+            />
           )}
         </div>
       </section>
 
-      <div
-        className={`qr-modal ${modalSender ? "qr-modal--open" : ""}`}
-        onClick={(event) => {
-          if (event.target === event.currentTarget) {
-            setQrModalSender(null);
-          }
-        }}
-      >
-        <div className="qr-modal__content">
+      <Modal isOpen={Boolean(modalSender)} onClose={() => setQrModalSender(null)}>
+        <div className="modal__content">
           <h3 className="campaigns__title">QR del Canal</h3>
-          {modalSender?.qr_code ? (
-            <img className="qr-modal__image" src={modalSender.qr_code} alt="QR del canal" />
+          {qrData?.qr_code ? (
+            <img className="modal__image" src={qrData.qr_code} alt="QR del canal" />
           ) : (
-            <div className="qr-modal__image u-flex u-flex-center u-color-meta">Sin QR disponible</div>
+            <div className="modal__image u-flex u-flex-center u-color-meta">
+              Sin QR disponible
+            </div>
           )}
-          <p className="qr-modal__text">
-            {modalSender?.qr_code
+          <p className="modal__text">
+            {qrData?.qr_code
               ? "Escanea este QR para conectar el canal."
               : "Este canal no tiene QR disponible todavía."}
           </p>
@@ -178,7 +122,68 @@ export function ManageChannelsPage() {
             Cerrar
           </Button>
         </div>
-      </div>
+      </Modal>
+      <ChannelCreateModal
+        isOpen={isCreateOpen}
+        label={newLabel}
+        onLabelChange={setNewLabel}
+        onClose={() => {
+          setIsCreateOpen(false);
+          setNewLabel("");
+        }}
+        onSubmit={() => {
+          if (!newLabel.trim()) {
+            toast.error("El nombre es requerido");
+            return;
+          }
+          createSender.mutate(
+            { label: newLabel.trim() },
+            {
+              onSuccess: () => {
+                queryClient.invalidateQueries({ queryKey: ["sender-accounts"] });
+                toast.success("Canal creado");
+                setIsCreateOpen(false);
+                setNewLabel("");
+              },
+              onError: () => {
+                toast.error("No se pudo crear el canal");
+              },
+            }
+          );
+        }}
+        isSubmitting={createSender.isPending}
+      />
+      <ChannelEditModal
+        isOpen={Boolean(editSender)}
+        label={editLabel}
+        onLabelChange={setEditLabel}
+        onClose={() => {
+          setEditSender(null);
+          setEditLabel("");
+        }}
+        onSubmit={() => {
+          if (!editSender) return;
+          if (!editLabel.trim()) {
+            toast.error("El nombre es requerido");
+            return;
+          }
+          updateSender.mutate(
+            { senderId: editSender.id, payload: { label: editLabel.trim() } },
+            {
+              onSuccess: () => {
+                queryClient.invalidateQueries({ queryKey: ["sender-accounts"] });
+                toast.success("Canal actualizado");
+                setEditSender(null);
+                setEditLabel("");
+              },
+              onError: () => {
+                toast.error("No se pudo actualizar el canal");
+              },
+            }
+          );
+        }}
+        isSubmitting={updateSender.isPending}
+      />
     </>
   );
 }

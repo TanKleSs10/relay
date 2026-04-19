@@ -6,7 +6,7 @@ export type Message = z.infer<typeof MessageSchema>;
 export type MessagePayload = {
   recipient: string;
   content: string;
-  campaign_id: number;
+  campaign_id: string;
 };
 
 export type MessageUpdatePayload = Partial<MessagePayload>;

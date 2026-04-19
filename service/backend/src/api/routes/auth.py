@@ -40,4 +40,4 @@ def read_current_user(current_user: UserRead = Depends(require_user)):
 def logout(response: Response):
     settings = get_settings()
     response.delete_cookie(settings.jwt_cookie_name)
-    return response
+    return None

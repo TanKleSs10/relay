@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router";
 
-import { Button } from "../components/ui/Button";
+import { CampaignFormActions } from "../components/create-campaign/CampaignFormActions";
+import { CampaignFormFields } from "../components/create-campaign/CampaignFormFields";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -8,6 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 
 import { useUploadCampaign } from "../features";
+import { ArrowLeft } from "lucide-react";
 
 const formSchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
@@ -56,44 +58,14 @@ export function CreateCampaignPage() {
     <>
       <section className="actions">
         <Link className="btn btn--primary" to="/">
-          Volver al Panel
+          <ArrowLeft /> Volver al Panel
         </Link>
       </section>
       <section className="campaign-form">
         <h2 className="actions__title">Crear nueva campaña</h2>
         <form className="campaign-form__form" onSubmit={handleSubmit(onSubmit)}>
-          <div className="campaign-form__group">
-            <label htmlFor="name" className="campaign-form__label">
-              Nombre de la campaña
-            </label>
-            <input
-              type="text"
-              id="name"
-              className="campaign-form__input"
-              placeholder="Ej: Promoción Primavera"
-              {...register("name")}
-            />
-            {errors.name ? <p className="error-message">{errors.name.message}</p> : null}
-          </div>
-          <div className="campaign-form__group">
-            <label htmlFor="file" className="campaign-form__label">
-              Archivo CSV{" "}
-              <span className="campaign-form__hint">(Campos: phone_number, message)</span>
-            </label>
-            <input
-              type="file"
-              id="file"
-              className="campaign-form__input"
-              accept=".csv"
-              {...register("file")}
-            />
-            {errors.file ? <p className="error-message">{errors.file.message}</p> : null}
-          </div>
-          <div className="campaign-form__actions">
-            <Button type="submit" variant="primary">
-              Crear campaña
-            </Button>
-          </div>
+          <CampaignFormFields register={register} errors={errors} />
+          <CampaignFormActions isSubmitting={uploadCampaign.isPending} />
         </form>
       </section>
     </>

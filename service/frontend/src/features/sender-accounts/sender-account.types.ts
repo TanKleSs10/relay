@@ -1,4 +1,13 @@
 import type { z } from "zod";
-import { SenderAccountSchema } from "../../schemas";
+import { SenderAccountSchema, SenderQrSchema } from "../../schemas";
 
 export type SenderAccount = z.infer<typeof SenderAccountSchema>;
+export type SenderQr = z.infer<typeof SenderQrSchema>;
+
+export type SenderAccountCreatePayload = {
+  label: string;
+};
+
+export type SenderAccountUpdatePayload = {
+  label?: string;
+};

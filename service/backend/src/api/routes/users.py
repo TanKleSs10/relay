@@ -3,11 +3,13 @@ from sqlalchemy.orm import Session
 from uuid import UUID
 
 from src.api.routes.deps import get_db
-from src.api.schemas.users import UserCreate, UserRead, UserStatusUpdate
+from src.api.schemas.users import UserCreate, UserRead, UserStatusUpdate, UserUpdate
 from src.application.usecases.user_usecases import (
     create_user_usecase,
+    delete_user_usecase,
     get_user_usecase,
     list_users_usecase,
+    update_user_usecase,
     update_user_status_usecase,
 )
 from src.security.auth import require_admin
@@ -55,3 +57,22 @@ def update_user_status(
     _: UserRead = Depends(require_admin),
 ):
     return update_user_status_usecase(db, user_id, payload)
+
+
+@router.patch("/{user_id}", response_model=UserRead, status_code=status.HTTP_200_OK)
+def update_user(
+    user_id: UUID,
+    payload: UserUpdate,
+    db: Session = Depends(get_db),
+    _: UserRead = Depends(require_admin),
+):
+    return update_user_usecase(db, user_id, username=payload.username, email=payload.email)
+
+
+@router.delete("/{user_id}", response_model=UserRead, status_code=status.HTTP_200_OK)
+def delete_user(
+    user_id: UUID,
+    db: Session = Depends(get_db),
+    _: UserRead = Depends(require_admin),
+):
+    return delete_user_usecase(db, user_id)

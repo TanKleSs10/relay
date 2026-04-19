@@ -9,13 +9,14 @@ export const MessageStatusSchema = z.enum([
 ]);
 
 export const MessageSchema = z.object({
-  id: z.number().int(),
+  id: z.string().uuid(),
+  external_id: z.string().nullable().optional(),
   recipient: z.string().min(1),
   content: z.string().min(1),
   status: MessageStatusSchema,
-  campaign_id: z.number().int().optional(),
-  processing_by_worker: z.number().int().nullable().optional(),
-  processing_sender_id: z.number().int().nullable().optional(),
+  campaign_id: z.string().uuid().optional(),
+  processing_by_worker_id: z.string().uuid().nullable().optional(),
+  processing_sender_id: z.string().uuid().nullable().optional(),
   locked_at: z.string().datetime().nullable().optional(),
   sent_at: z.string().datetime().nullable().optional(),
   retry_count: z.number().int().optional(),
