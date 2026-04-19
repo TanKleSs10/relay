@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
+from uuid import UUID
 
 from datetime import datetime, timezone
 
@@ -29,7 +30,7 @@ def get_idle_worker(db: Session) -> Worker | None:
     return db.query(Worker).filter(Worker.status == WorkerStatus.ONLINE).first()
 
 
-def assign_campaign(db: Session, worker: Worker, campaign_id: int) -> Worker:
+def assign_campaign(db: Session, worker: Worker, campaign_id: UUID) -> Worker:
     if not can_transition(worker.status, WorkerStatus.ONLINE):
         raise ConflictError(
             f"Worker {worker.id} cannot transition from {worker.status} to ONLINE"

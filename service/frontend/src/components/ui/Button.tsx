@@ -6,6 +6,7 @@ const variants = {
   success: "btn--success",
   danger: "btn--danger",
   tertiary: "btn--tertiary",
+  ghost: "btn--ghost",
 };
 
 type Variant = keyof typeof variants;

@@ -32,10 +32,11 @@ export enum SenderAccountStatus {
 export enum WorkerStatus {
   ONLINE = "ONLINE",
   OFFLINE = "OFFLINE",
+  BUSY = "BUSY",
 }
 
 export enum WorkerType {
-  QR = "qr",
-  SESSION = "session",
-  CAMPAIGN = "campaign",
+  QR = "QR",
+  SESSION = "SESSION",
+  CAMPAIGN = "CAMPAIGN",
 }

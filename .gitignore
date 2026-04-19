@@ -23,6 +23,7 @@ htmlcov/
 # IDE/editor
 .vscode/
 .idea/
+.codex/
 
 # OS
 .DS_Store
@@ -37,6 +38,8 @@ build/
 .wwebjs_cache/
 
 *.csv
+*.codex
+
 # local data
 campaign.csv
 campaign2.csv

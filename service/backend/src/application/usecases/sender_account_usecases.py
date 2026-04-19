@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
+from uuid import UUID
 
 from src.api.schemas.sender_accounts import SenderAccountCreate, SenderAccountUpdate
 from src.application.errors import NotFoundError
@@ -30,14 +31,14 @@ def list_senders(db: Session) -> list[SenderAccount]:
     return list_sender_accounts(db)
 
 
-def get_sender(sender_id: int, db: Session) -> SenderAccount:
+def get_sender(sender_id: UUID, db: Session) -> SenderAccount:
     sender = get_sender_account_by_id(db, sender_id)
     if not sender:
         raise NotFoundError("Sender account not found")
     return sender
 
 
-def remove_sender(sender_id: int, db: Session) -> None:
+def remove_sender(sender_id: UUID, db: Session) -> None:
     sender = get_sender_account_by_id(db, sender_id)
     if not sender:
         raise NotFoundError("Sender account not found")
@@ -50,7 +51,7 @@ def remove_sender(sender_id: int, db: Session) -> None:
 
 
 def update_sender(
-    sender_id: int, payload: SenderAccountUpdate, db: Session
+    sender_id: UUID, payload: SenderAccountUpdate, db: Session
 ) -> SenderAccount:
     sender = get_sender_account_by_id(db, sender_id)
     if not sender:
@@ -65,7 +66,7 @@ def update_sender(
         raise exc
 
 
-def reset_sender(sender_id: int, db: Session) -> SenderAccount:
+def reset_sender(sender_id: UUID, db: Session) -> SenderAccount:
     sender = get_sender_account_by_id(db, sender_id)
     if not sender:
         raise NotFoundError("Sender account not found")

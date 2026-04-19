@@ -4,6 +4,9 @@ from src.domain.models import (
     CampaignStatus,
     MessageStatus,
     SenderAccountStatus,
+    SenderSessionHealth,
+    SessionLogEvent,
+    UserStatus,
     WorkerStatus,
     WorkerType,
 )
@@ -12,6 +15,9 @@ ENUM_REGISTRY = {
     "campaign_status": CampaignStatus,
     "message_status": MessageStatus,
     "sender_account_status": SenderAccountStatus,
+    "sender_session_health": SenderSessionHealth,
+    "session_log_event": SessionLogEvent,
+    "user_status": UserStatus,
     "worker_status": WorkerStatus,
     "worker_type": WorkerType,
 }

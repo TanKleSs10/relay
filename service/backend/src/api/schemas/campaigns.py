@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import ConfigDict, Field, PositiveInt
+from pydantic import ConfigDict, Field, UUID4
 
 from src.api.schemas.base import APIModel
 from src.domain import CampaignStatus
+
+from src.api.schemas.messages import MessageRead
 
 
 class CampaignBase(APIModel):
@@ -21,12 +23,8 @@ class CampaignUpdate(APIModel):
     status: CampaignStatus | None = None
 
 
-
-from src.api.schemas.messages import MessageRead
-
-
 class CampaignMetrics(APIModel):
-    campaign_id: PositiveInt
+    campaign_id: UUID4
     total: int = Field(ge=0)
     sent: int = Field(ge=0)
     failed: int = Field(ge=0)
@@ -35,8 +33,9 @@ class CampaignMetrics(APIModel):
     no_wa: int = Field(ge=0)
     effectiveness: float = Field(ge=0, le=1)
 
+
 class CampaignRead(CampaignBase):
-    id: PositiveInt
+    id: UUID4
     status: CampaignStatus
     created_at: datetime
     started_at: datetime | None = None

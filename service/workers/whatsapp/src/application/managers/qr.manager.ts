@@ -7,7 +7,7 @@ import { delay } from "../../utils/delay";
 import type { Logger } from "../../utils/logger";
 
 export class QrManager {
-  private initialized = new Set<number>();
+  private initialized = new Set<string>();
 
   constructor(
     private provider: MessageProvider,
@@ -15,7 +15,7 @@ export class QrManager {
     private logger: Logger
   ) {}
 
-  private registerHandlers(senderId: number) {
+  private registerHandlers(senderId: string) {
     if (this.initialized.has(senderId)) return;
     this.initialized.add(senderId);
     this.provider.onQr?.(senderId, async (qr) => {
