@@ -10,6 +10,12 @@ class Settings(BaseSettings):
     sql_echo: bool = False
     log_level: str = "INFO"
     auto_create_schema: bool = False
+    cors_allowed_origins: str = (
+        "http://localhost:5173,"
+        "http://127.0.0.1:5173,"
+        "https://relayengine.app,"
+        "https://www.relayengine.app"
+    )
     seed_superuser: bool = True
     superuser_username: str = "admin"
     superuser_email: str = "admin@relay.com"
@@ -34,3 +40,11 @@ def get_settings() -> Settings:
     if not settings.jwt_secret:
         raise RuntimeError("JWT_SECRET environment variable is not set")
     return settings
+
+
+def get_cors_allowed_origins(settings: Settings) -> list[str]:
+    return [
+        origin.strip()
+        for origin in settings.cors_allowed_origins.split(",")
+        if origin.strip()
+    ]
