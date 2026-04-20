@@ -4,8 +4,11 @@ from sqlalchemy.orm import Session
 from uuid import UUID
 
 from src.api.schemas.sender_accounts import SenderAccountCreate, SenderAccountUpdate
+from src.application.errors import ConflictError
 from src.domain import SenderAccount, SenderAccountStatus
 from uuid import UUID, uuid4
+
+MAX_SENDER_ACCOUNTS = 8
 
 
 def get_sender_accounts_by_status(
@@ -25,6 +28,10 @@ def list_sender_accounts(db: Session) -> list[SenderAccount]:
 def create_sender_account(
     db: Session, payload: SenderAccountCreate | None = None
 ) -> SenderAccount:
+    sender_count = db.query(SenderAccount).count()
+    if sender_count >= MAX_SENDER_ACCOUNTS:
+        raise ConflictError(f"Sender limit reached (max {MAX_SENDER_ACCOUNTS})")
+
     label = None
     if payload:
         label = payload.label

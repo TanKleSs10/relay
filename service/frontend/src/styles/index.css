@@ -101,6 +101,30 @@ a {
   padding: 2rem 1rem;
 }
 
+.app-footer {
+  max-width: 1200px;
+  margin: 1rem auto 0;
+  padding: 0 1rem 1.5rem;
+  text-align: center;
+}
+
+.app-footer__text,
+.footer-note {
+  color: var(--color-card-meta-label);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.app-footer__link {
+  color: var(--color-header-title);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.app-footer__link:hover {
+  text-decoration: underline;
+}
+
 .actions {
   margin-bottom: 3rem;
 }

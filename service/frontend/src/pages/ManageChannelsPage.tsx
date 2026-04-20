@@ -20,6 +20,8 @@ import {
 } from "../features";
 import { ArrowLeft, CirclePlus } from "lucide-react";
 
+const MAX_SENDERS = 8;
+
 export function ManageChannelsPage() {
   const queryClient = useQueryClient();
   const { data: channels = [], isLoading } = useSenderAccounts();
@@ -36,6 +38,7 @@ export function ManageChannelsPage() {
   const { data: qrData } = useSenderQr(qrSenderId, Boolean(qrModalSender));
   const { data: user } = useMe();
   const isAdmin = (user?.roles ?? []).includes("ADMIN");
+  const hasReachedSenderLimit = channels.length >= MAX_SENDERS;
 
   const modalSender = qrModalSender
     ? channels.find((item) => item.id === qrModalSender.id) || qrModalSender
@@ -52,13 +55,28 @@ export function ManageChannelsPage() {
           )}
           <Button
             variant="primary"
-            onClick={() =>
-              setIsCreateOpen(true)
+            onClick={() => {
+              if (hasReachedSenderLimit) {
+                toast.error(`Has alcanzado el limite de ${MAX_SENDERS} canales`);
+                return;
+              }
+              setIsCreateOpen(true);
+            }}
+            disabled={hasReachedSenderLimit}
+            title={
+              hasReachedSenderLimit
+                ? `Has alcanzado el limite de ${MAX_SENDERS} canales`
+                : undefined
             }
           >
             <CirclePlus /> Crear Canal
           </Button>
         </div>
+        {hasReachedSenderLimit ? (
+          <p className="footer-note" style={{ marginTop: "0.9rem" }}>
+            Limite alcanzado: solo se permiten {MAX_SENDERS} canales por instancia.
+          </p>
+        ) : null}
       </section>
 
       <section className="campaigns">
@@ -145,8 +163,8 @@ export function ManageChannelsPage() {
                 setIsCreateOpen(false);
                 setNewLabel("");
               },
-              onError: () => {
-                toast.error("No se pudo crear el canal");
+              onError: (error) => {
+                toast.error(error instanceof Error ? error.message : "No se pudo crear el canal");
               },
             }
           );

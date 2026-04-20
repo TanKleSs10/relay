@@ -1,6 +1,7 @@
 import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from src.api.routes.campaigns import router as campaigns_router
 from src.api.routes.health import router as health_router
 from src.api.routes.metadata import router as metadata_router
@@ -18,7 +19,7 @@ from src.application.errors import (
     ValidationError,
     UnauthorizedError,
 )
-from src.config import get_settings
+from src.config import get_cors_allowed_origins, get_settings
 from src.infrastructure.db.base import Base
 from src.infrastructure.db.session import SessionLocal, engine
 from src.infrastructure.db.seed import seed_default_data
@@ -28,6 +29,14 @@ app = FastAPI()
 settings = get_settings()
 
 logging.basicConfig(level=settings.log_level)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=get_cors_allowed_origins(settings),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(health_router)
 app.include_router(auth_router)

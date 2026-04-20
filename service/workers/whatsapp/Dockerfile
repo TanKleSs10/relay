@@ -1,4 +1,4 @@
-FROM node:20-bookworm
+FROM node:20-bookworm AS base
 
 WORKDIR /app
 
@@ -21,10 +21,28 @@ RUN apt-get update && apt-get install -y \
 
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
+FROM base AS development
+
 COPY package*.json ./
-RUN npm install
+RUN npm ci
+
+CMD ["npm", "run", "dev"]
+
+FROM base AS build
+
+COPY package*.json ./
+RUN npm ci
 
 COPY tsconfig.json ./
 COPY src ./src
 
-CMD ["npm", "run", "dev"]
+RUN npm run build
+
+FROM base AS production
+
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+COPY --from=build /app/dist ./dist
+
+CMD ["npm", "run", "start"]
