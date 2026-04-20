@@ -1,6 +1,6 @@
-import { delay } from "../../utils/delay";
-import type { Logger } from "../../utils/logger";
-import type { QrManager } from "../managers/qr.manager";
+import { delay } from "../../utils/delay.js";
+import type { Logger } from "../../utils/logger.js";
+import type { QrManager } from "../managers/qr.manager.js";
 
 export class QrWorker {
   constructor(

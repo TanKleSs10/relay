@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
 
-import { CampaignStatus } from "../../domain/enums";
+import { CampaignStatus } from "../../domain/enums/index.js";
 
 export class CampaignRepository {
   private pool: Pool;

@@ -1,7 +1,7 @@
 import whatsapp from "whatsapp-web.js";
 import type { Client } from "whatsapp-web.js";
 
-import type { MessageProvider } from "../../domain/interfaces/message-provider.interface";
+import type { MessageProvider } from "../../domain/interfaces/message-provider.interface.js";
 
 type SenderEntry = {
   client?: Client;

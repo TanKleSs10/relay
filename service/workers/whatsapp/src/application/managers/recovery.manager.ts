@@ -1,5 +1,5 @@
-import type { MessageRepository } from "../../infrastructure/repositories/message.repository";
-import type { Logger } from "../../utils/logger";
+import type { MessageRepository } from "../../infrastructure/repositories/message.repository.js";
+import type { Logger } from "../../utils/logger.js";
 
 export class RecoveryManager {
   constructor(

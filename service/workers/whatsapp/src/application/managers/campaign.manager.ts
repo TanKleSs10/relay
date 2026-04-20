@@ -1,14 +1,14 @@
-import type { MessageProvider } from "../../domain/interfaces/message-provider.interface";
-import { SenderAccountStatus } from "../../domain/enums";
-import type { SenderRepository } from "../../domain/interfaces/sender.repository.interface";
-import { CampaignRepository } from "../../infrastructure/repositories/campaign.repository";
+import type { MessageProvider } from "../../domain/interfaces/message-provider.interface.js";
+import { SenderAccountStatus } from "../../domain/enums/index.js";
+import type { SenderRepository } from "../../domain/interfaces/sender.repository.interface.js";
+import { CampaignRepository } from "../../infrastructure/repositories/campaign.repository.js";
 import {
   MessageRepository,
   type MessageRow,
-} from "../../infrastructure/repositories/message.repository";
-import { SendLogRepository } from "../../infrastructure/repositories/send-log.repository";
-import { randomDelay } from "../../utils/delay";
-import type { Logger } from "../../utils/logger";
+} from "../../infrastructure/repositories/message.repository.js";
+import { SendLogRepository } from "../../infrastructure/repositories/send-log.repository.js";
+import { randomDelay } from "../../utils/delay.js";
+import type { Logger } from "../../utils/logger.js";
 
 const MAX_MESSAGES_PER_TICK = 12;
 const MAX_PER_SENDER_PER_TICK = 1;

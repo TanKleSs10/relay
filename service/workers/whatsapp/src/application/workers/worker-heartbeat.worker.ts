@@ -1,6 +1,6 @@
-import { delay } from "../../utils/delay";
-import type { Logger } from "../../utils/logger";
-import type { WorkerManager } from "../managers/worker.manager";
+import { delay } from "../../utils/delay.js";
+import type { Logger } from "../../utils/logger.js";
+import type { WorkerManager } from "../managers/worker.manager.js";
 
 export class WorkerHeartbeatWorker {
   constructor(

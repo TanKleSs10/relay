@@ -1,9 +1,9 @@
 import type { Pool } from "pg";
 
-import { WorkerEntity } from "../../domain/entities/worker.entity";
-import { WorkerType } from "../../domain/enums";
-import type { WorkerStatus } from "../../domain/enums";
-import type { WorkerRepository as WorkerRepositoryPort } from "../../domain/interfaces/worker.repository.interface";
+import { WorkerEntity } from "../../domain/entities/worker.entity.js";
+import { WorkerType } from "../../domain/enums/index.js";
+import type { WorkerStatus } from "../../domain/enums/index.js";
+import type { WorkerRepository as WorkerRepositoryPort } from "../../domain/interfaces/worker.repository.interface.js";
 
 export class WorkerRepository implements WorkerRepositoryPort {
   private pool: Pool;

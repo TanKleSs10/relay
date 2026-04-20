@@ -1,5 +1,5 @@
-import type { WorkerEntity } from "../entities/worker.entity";
-import type { WorkerStatus } from "../enums";
+import type { WorkerEntity } from "../entities/worker.entity.js";
+import type { WorkerStatus } from "../enums/index.js";
 
 export interface WorkerRepository {
   findByName(workerName: string): Promise<WorkerEntity | null>;

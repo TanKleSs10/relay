@@ -1,6 +1,6 @@
-import { delay } from "../../utils/delay";
-import type { Logger } from "../../utils/logger";
-import type { RecoveryManager } from "../managers/recovery.manager";
+import { delay } from "../../utils/delay.js";
+import type { Logger } from "../../utils/logger.js";
+import type { RecoveryManager } from "../managers/recovery.manager.js";
 
 export class RecoveryWorker {
   constructor(

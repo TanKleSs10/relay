@@ -1,8 +1,8 @@
 import type { Pool } from "pg";
 
-import { SenderEntity } from "../../domain/entities/sender.entity";
-import type { SenderRepository as SenderRepositoryPort } from "../../domain/interfaces/sender.repository.interface";
-import { SenderAccountStatus } from "../../domain/enums";
+import { SenderEntity } from "../../domain/entities/sender.entity.js";
+import type { SenderRepository as SenderRepositoryPort } from "../../domain/interfaces/sender.repository.interface.js";
+import { SenderAccountStatus } from "../../domain/enums/index.js";
 
 export class SenderRepository implements SenderRepositoryPort {
   private pool: Pool;

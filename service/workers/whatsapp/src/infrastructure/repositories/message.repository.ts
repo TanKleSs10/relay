@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
 
-import { MessageStatus } from "../../domain/enums";
+import { MessageStatus } from "../../domain/enums/index.js";
 
 export type MessageRow = {
   id: string;

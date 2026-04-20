@@ -1,10 +1,10 @@
 import qrcode from "qrcode";
 
-import type { MessageProvider } from "../../domain/interfaces/message-provider.interface";
-import type { SenderRepository } from "../../domain/interfaces/sender.repository.interface";
-import { SenderAccountStatus } from "../../domain/enums";
-import { delay } from "../../utils/delay";
-import type { Logger } from "../../utils/logger";
+import type { MessageProvider } from "../../domain/interfaces/message-provider.interface.js";
+import type { SenderRepository } from "../../domain/interfaces/sender.repository.interface.js";
+import { SenderAccountStatus } from "../../domain/enums/index.js";
+import { delay } from "../../utils/delay.js";
+import type { Logger } from "../../utils/logger.js";
 
 export class QrManager {
   private initialized = new Set<string>();

@@ -1,7 +1,7 @@
-import type { WorkerEntity } from "../../domain/entities/worker.entity";
-import type { WorkerRepository } from "../../domain/interfaces/worker.repository.interface";
-import { WorkerStatus } from "../../domain/enums";
-import type { Logger } from "../../utils/logger";
+import type { WorkerEntity } from "../../domain/entities/worker.entity.js";
+import type { WorkerRepository } from "../../domain/interfaces/worker.repository.interface.js";
+import { WorkerStatus } from "../../domain/enums/index.js";
+import type { Logger } from "../../utils/logger.js";
 
 export class WorkerManager {
   constructor(
