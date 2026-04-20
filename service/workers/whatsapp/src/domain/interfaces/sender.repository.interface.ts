@@ -1,5 +1,5 @@
-import type { SenderEntity } from "../entities/sender.entity";
-import type { SenderAccountStatus } from "../enums";
+import type { SenderEntity } from "../entities/sender.entity.js";
+import type { SenderAccountStatus } from "../enums/index.js";
 
 export interface SenderRepository {
   findById(senderId: string): Promise<SenderEntity | null>;

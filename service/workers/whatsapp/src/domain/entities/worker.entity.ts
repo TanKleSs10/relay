@@ -1,4 +1,4 @@
-import type { WorkerStatus, WorkerType } from "../enums";
+import type { WorkerStatus, WorkerType } from "../enums/index.js";
 
 export class WorkerEntity {
   id: string;

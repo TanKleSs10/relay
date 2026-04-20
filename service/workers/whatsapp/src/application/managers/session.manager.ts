@@ -1,11 +1,11 @@
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { MessageProvider } from "../../domain/interfaces/message-provider.interface";
-import { SenderAccountStatus } from "../../domain/enums";
-import type { SenderEntity } from "../../domain/entities/sender.entity";
-import type { SenderRepository } from "../../domain/interfaces/sender.repository.interface";
-import type { Logger } from "../../utils/logger";
+import type { MessageProvider } from "../../domain/interfaces/message-provider.interface.js";
+import { SenderAccountStatus } from "../../domain/enums/index.js";
+import type { SenderEntity } from "../../domain/entities/sender.entity.js";
+import type { SenderRepository } from "../../domain/interfaces/sender.repository.interface.js";
+import type { Logger } from "../../utils/logger.js";
 
 const AUTH_DATA_PATH = "/tmp/whatsapp";
 

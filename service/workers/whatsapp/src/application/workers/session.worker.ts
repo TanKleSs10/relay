@@ -1,6 +1,6 @@
-import { delay } from "../../utils/delay";
-import type { Logger } from "../../utils/logger";
-import type { SessionManager } from "../managers/session.manager";
+import { delay } from "../../utils/delay.js";
+import type { Logger } from "../../utils/logger.js";
+import type { SessionManager } from "../managers/session.manager.js";
 
 export class SessionWorker {
   constructor(

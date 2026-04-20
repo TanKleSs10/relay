@@ -1,6 +1,6 @@
-import { delay } from "../../utils/delay";
-import type { Logger } from "../../utils/logger";
-import type { CampaignManager } from "../managers/campaign.manager";
+import { delay } from "../../utils/delay.js";
+import type { Logger } from "../../utils/logger.js";
+import type { CampaignManager } from "../managers/campaign.manager.js";
 
 export class CampaignWorker {
   constructor(

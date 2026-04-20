@@ -1,4 +1,4 @@
-import type { SenderAccountStatus } from "../enums";
+import type { SenderAccountStatus } from "../enums/index.js";
 
 export class SenderEntity {
   id: string;

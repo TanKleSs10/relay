@@ -1,6 +1,6 @@
 import pg from "pg";
 import type { Pool as PoolType } from "pg";
-import { envs } from "../../config/envs";
+import { envs } from "../../config/envs.js";
 
 let pool: PoolType | null = null;
 
