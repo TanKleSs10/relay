@@ -31,10 +31,12 @@ services:
     build:
       context: ./service/workers/whatsapp
       dockerfile: Dockerfile
+      target: development
     env_file:
       - .env
     environment:
       - NO_SANDBOX=1
+    command: npm run dev
     volumes:
       - ./service/workers/whatsapp:/app
       - /app/node_modules
