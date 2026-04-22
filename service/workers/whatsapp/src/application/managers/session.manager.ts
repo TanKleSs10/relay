@@ -1,13 +1,9 @@
-import { rm } from "node:fs/promises";
-import { join } from "node:path";
-
 import type { MessageProvider } from "../../domain/interfaces/message-provider.interface.js";
 import { SenderAccountStatus } from "../../domain/enums/index.js";
 import type { SenderEntity } from "../../domain/entities/sender.entity.js";
 import type { SenderRepository } from "../../domain/interfaces/sender.repository.interface.js";
+import { removeAuthSession } from "../../utils/auth.js";
 import type { Logger } from "../../utils/logger.js";
-
-const AUTH_DATA_PATH = "/tmp/whatsapp";
 
 export class SessionManager {
   constructor(
@@ -34,8 +30,7 @@ async function cleanupMissingSenders(
   for (const senderId of providerIds) {
     if (!dbIds.has(senderId)) {
       logger.warn(`session for sender ${senderId} missing in DB. cleaning up`);
-      await provider.clear?.(senderId);
-      await cleanupAuthState(senderId, logger);
+      await provider.clear?.(senderId, true);
     }
   }
 }
@@ -74,7 +69,7 @@ async function syncSessions(
           SenderAccountStatus.WAITING_QR
         );
         await provider.clear?.(sender.id);
-        await cleanupAuthState(sender.id, logger);
+        await cleanupAuthState(sender.sessionKey, logger);
         continue;
       }
       if (state && state !== "CONNECTED") {
@@ -97,7 +92,7 @@ async function syncSessions(
         SenderAccountStatus.INITIALIZING
       );
       try {
-        await provider.initialize(sender.id);
+        await provider.initialize(sender.id, sender.sessionKey);
       } catch (error) {
         logger.error(`failed to reinitialize sender ${sender.id}`, error);
         await senderRepository.updateStatus(sender.id, SenderAccountStatus.ERROR);
@@ -107,12 +102,11 @@ async function syncSessions(
   }
 }
 
-async function cleanupAuthState(senderId: string, logger: Logger): Promise<void> {
-  const sessionPath = join(AUTH_DATA_PATH, `session-sender-${senderId}`);
+async function cleanupAuthState(sessionKey: string, logger: Logger): Promise<void> {
   try {
-    await rm(sessionPath, { recursive: true, force: true });
+    await removeAuthSession(sessionKey);
   } catch (error) {
-    logger.warn(`failed to clean auth state for sender ${senderId}`);
+    logger.warn(`failed to clean auth state for session ${sessionKey}`);
     if (error) {
       logger.error("cleanup error", error);
     }

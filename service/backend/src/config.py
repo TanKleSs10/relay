@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     jwt_expires_minutes: int = 120
     jwt_cookie_name: str = "relay_access"
     jwt_cookie_secure: bool = False
+    whatsapp_auth_path: str = "/app/.wwebjs_auth"
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -2,6 +2,7 @@ import type { SenderAccountStatus } from "../enums/index.js";
 
 export class SenderEntity {
   id: string;
+  sessionKey: string;
   phoneNumber: string | null;
   status: SenderAccountStatus;
   qrCode: string | null;
@@ -14,6 +15,7 @@ export class SenderEntity {
 
   constructor(params: {
     id: string;
+    sessionKey: string;
     phoneNumber: string | null;
     status: SenderAccountStatus;
     qrCode: string | null;
@@ -25,6 +27,7 @@ export class SenderEntity {
     updatedAt: Date;
   }) {
     this.id = params.id;
+    this.sessionKey = params.sessionKey;
     this.phoneNumber = params.phoneNumber;
     this.status = params.status;
     this.qrCode = params.qrCode;
@@ -38,6 +41,7 @@ export class SenderEntity {
 
   static fromRow(row: {
     id: string;
+    session_key: string | null;
     phone_number: string | null;
     status: SenderAccountStatus;
     qr_code: string | null;
@@ -50,6 +54,7 @@ export class SenderEntity {
   }): SenderEntity {
     return new SenderEntity({
       id: row.id,
+      sessionKey: row.session_key ?? `sender-${row.id}`,
       phoneNumber: row.phone_number,
       status: row.status,
       qrCode: row.qr_code,

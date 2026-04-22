@@ -303,7 +303,12 @@ class SenderAccount(Base):
         "SendLog", back_populates="sender", cascade="all, delete-orphan"
     )
     session: Mapped["SenderSession"] = relationship(
-        "SenderSession", back_populates="sender", uselist=False
+        "SenderSession",
+        back_populates="sender",
+        uselist=False,
+        cascade="all, delete-orphan",
+        single_parent=True,
+        passive_deletes=True,
     )
 
 
@@ -315,7 +320,7 @@ class SenderSession(Base):
     )
     sender_account_id: Mapped[PyUUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("sender_accounts.id"),
+        ForeignKey("sender_accounts.id", ondelete="CASCADE"),
         nullable=False,
         unique=True,
     )
@@ -360,10 +365,14 @@ class SessionLog(Base):
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
     )
     sender_account_id: Mapped[PyUUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("sender_accounts.id"), nullable=False
+        UUID(as_uuid=True),
+        ForeignKey("sender_accounts.id", ondelete="CASCADE"),
+        nullable=False,
     )
     sender_session_id: Mapped[PyUUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("sender_sessions.id"), nullable=False
+        UUID(as_uuid=True),
+        ForeignKey("sender_sessions.id", ondelete="CASCADE"),
+        nullable=False,
     )
     event_type: Mapped[SessionLogEvent] = mapped_column(
         SAEnum(SessionLogEvent, name="session_log_event"),

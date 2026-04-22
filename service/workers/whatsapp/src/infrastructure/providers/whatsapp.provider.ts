@@ -2,8 +2,10 @@ import whatsapp from "whatsapp-web.js";
 import type { Client } from "whatsapp-web.js";
 
 import type { MessageProvider } from "../../domain/interfaces/message-provider.interface.js";
+import { AUTH_DATA_PATH, removeAuthSession } from "../../utils/auth.js";
 
 type SenderEntry = {
+  sessionKey?: string;
   client?: Client;
   onQr?: (qr: string) => void;
   onReady?: (phoneNumber: string | null) => void;
@@ -15,10 +17,20 @@ type SenderEntry = {
 export class WhatsAppProvider implements MessageProvider {
   private clients = new Map<string, SenderEntry>();
 
-  async initialize(senderId: string): Promise<void> {
+  async initialize(senderId: string, sessionKey: string): Promise<void> {
     // Create or reuse a client for a sender and forward events to callbacks.
     const existing = this.clients.get(senderId);
-    if (existing?.client || existing?.initializing) {
+    if (
+      existing?.sessionKey &&
+      existing.sessionKey !== sessionKey
+    ) {
+      await this.clear(senderId, false);
+      await removeAuthSession(existing.sessionKey);
+    }
+    if (
+      existing?.sessionKey === sessionKey &&
+      (existing.client || existing.initializing)
+    ) {
       return;
     }
 
@@ -29,8 +41,8 @@ export class WhatsAppProvider implements MessageProvider {
 
     const client = new Client({
       authStrategy: new LocalAuth({
-        clientId: `sender-${senderId}`,
-        dataPath: "/tmp/whatsapp",
+        clientId: sessionKey,
+        dataPath: AUTH_DATA_PATH,
       }),
       puppeteer: {
         args: process.env.NO_SANDBOX === "1" ? ["--no-sandbox", "--disable-setuid-sandbox"] : [],
@@ -39,6 +51,7 @@ export class WhatsAppProvider implements MessageProvider {
 
     const entry: SenderEntry = existing ?? {};
     entry.initializing = true;
+    entry.sessionKey = sessionKey;
     entry.client = client;
     this.clients.set(senderId, entry);
 
@@ -61,12 +74,12 @@ export class WhatsAppProvider implements MessageProvider {
       console.warn(`Provider disconnected for sender ${senderId}: ${reason}`);
       entry.initializing = false;
       entry.onDisconnect?.();
-      void this.clear(senderId);
+      void this.clear(senderId, false);
     });
     client.on("auth_failure", (message: string) => {
       console.error(`Provider auth failure for sender ${senderId}: ${message}`);
       entry.initializing = false;
-      void this.clear(senderId);
+      void this.clear(senderId, false);
     });
     client.on("authenticated", () => {
       console.log(`Provider authenticated event for sender ${senderId}`);
@@ -136,7 +149,7 @@ export class WhatsAppProvider implements MessageProvider {
     this.clients.set(senderId, entry);
   }
 
-  async clear(senderId: string): Promise<void> {
+  async clear(senderId: string, destroyAuth = false): Promise<void> {
     const entry = this.clients.get(senderId);
     if (entry?.client) {
       try {
@@ -144,6 +157,9 @@ export class WhatsAppProvider implements MessageProvider {
       } catch (error) {
         console.warn(`Failed to destroy client for sender ${senderId}`, error);
       }
+    }
+    if (destroyAuth && entry?.sessionKey) {
+      await removeAuthSession(entry.sessionKey);
     }
     this.clients.delete(senderId);
   }
