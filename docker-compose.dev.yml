@@ -7,6 +7,7 @@ services:
       - .env
     volumes:
       - ./service/backend:/app
+      - whatsapp_auth:/app/.wwebjs_auth
     ports:
       - "8000:8000"
     depends_on:

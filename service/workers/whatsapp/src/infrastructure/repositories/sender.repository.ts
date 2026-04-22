@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import type { Pool } from "pg";
 
 import { SenderEntity } from "../../domain/entities/sender.entity.js";
@@ -14,6 +15,7 @@ export class SenderRepository implements SenderRepositoryPort {
   async findById(senderId: string): Promise<SenderEntity | null> {
     const result = await this.pool.query(
       `SELECT sa.id,
+              ss.session_key,
               sa.phone_number,
               sa.status,
               ss.qr_code,
@@ -36,6 +38,7 @@ export class SenderRepository implements SenderRepositoryPort {
   async listByStatus(status: SenderAccountStatus): Promise<SenderEntity[]> {
     const result = await this.pool.query(
       `SELECT sa.id,
+              ss.session_key,
               sa.phone_number,
               sa.status,
               ss.qr_code,
@@ -57,6 +60,7 @@ export class SenderRepository implements SenderRepositoryPort {
   async listQrRequiredWithoutCode(): Promise<SenderEntity[]> {
     const result = await this.pool.query(
       `SELECT sa.id,
+              ss.session_key,
               sa.phone_number,
               sa.status,
               ss.qr_code,
@@ -83,6 +87,7 @@ export class SenderRepository implements SenderRepositoryPort {
   async listAll(): Promise<SenderEntity[]> {
     const result = await this.pool.query(
       `SELECT sa.id,
+              ss.session_key,
               sa.phone_number,
               sa.status,
               ss.qr_code,
@@ -100,6 +105,7 @@ export class SenderRepository implements SenderRepositoryPort {
   }
 
   async resetSession(senderId: string): Promise<SenderEntity> {
+    const sessionKey = `sender-${senderId}-${crypto.randomUUID().slice(0, 8)}`;
     await this.pool.query(
       "UPDATE sender_accounts SET status = $2, phone_number = NULL, updated_at = NOW() WHERE id = $1",
       [senderId, SenderAccountStatus.WAITING_QR]
@@ -108,8 +114,8 @@ export class SenderRepository implements SenderRepositoryPort {
       `INSERT INTO sender_sessions (sender_account_id, session_key, qr_code, qr_generated_at)
        VALUES ($1, $2, NULL, NULL)
        ON CONFLICT (sender_account_id)
-       DO UPDATE SET qr_code = NULL, qr_generated_at = NULL, updated_at = NOW()`,
-      [senderId, `sender-${senderId}`]
+       DO UPDATE SET session_key = EXCLUDED.session_key, qr_code = NULL, qr_generated_at = NULL, updated_at = NOW()`,
+      [senderId, sessionKey]
     );
     const row = await this.findById(senderId);
     if (!row) {

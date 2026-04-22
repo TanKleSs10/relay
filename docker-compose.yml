@@ -6,6 +6,8 @@ services:
     env_file:
       - .env
     restart: unless-stopped
+    volumes:
+      - whatsapp_auth:/app/.wwebjs_auth
     depends_on:
       - db
     networks:

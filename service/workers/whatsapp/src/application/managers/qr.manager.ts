@@ -71,7 +71,7 @@ export class QrManager {
       }
 
       try {
-        await this.provider.initialize(sender.id);
+        await this.provider.initialize(sender.id, sender.sessionKey);
       } catch (error) {
         this.logger.error(`INIT failed for sender ${sender.id}`, error);
         await this.senderRepository.updateStatus(sender.id, SenderAccountStatus.ERROR);
