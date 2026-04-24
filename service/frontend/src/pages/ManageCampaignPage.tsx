@@ -52,7 +52,10 @@ export function ManageCampaignPage() {
   const statusOptions = ["all", "PENDING", "PROCESSING", "SENT", "FAILED", "NO_WA"];
   const formatCampaignError = (error: unknown) => {
     const message = error instanceof Error ? error.message : "";
-    if (message.includes("No CONNECTED senders available")) {
+    if (
+      message.includes("No CONNECTED senders available") ||
+      message.includes("No CONNECTED or IDLE senders available")
+    ) {
       return "No hay senders disponibles";
     }
     return message || "No se pudo reintentar";

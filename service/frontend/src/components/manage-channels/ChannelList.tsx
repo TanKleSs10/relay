@@ -5,8 +5,11 @@ import type { SenderAccount } from "../../schemas";
 
 const senderStatusLabels: Record<string, string> = {
   CREATED: "Creado",
+  IDLE: "Inactivo",
   INITIALIZING: "Inicializando",
   WAITING_QR: "Esperando QR",
+  AUTHENTICATING: "Autenticando",
+  CONNECTING: "Conectando",
   CONNECTED: "Conectado",
   SENDING: "Enviando",
   COOLDOWN: "En enfriamiento",

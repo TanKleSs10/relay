@@ -1,6 +1,6 @@
 """add sender session delete cascade
 
-Revision ID: 0005_sender_session_delete_cascade
+Revision ID: 0005_sender_cascade
 Revises: 0004_add_message_external_id
 Create Date: 2026-04-22 00:00:00.000000
 """
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from alembic import op
 
-revision = "0005_sender_session_delete_cascade"
+revision = "0005_sender_cascade"
 down_revision = "0004_add_message_external_id"
 branch_labels = None
 depends_on = None
