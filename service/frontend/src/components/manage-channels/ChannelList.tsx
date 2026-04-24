@@ -7,6 +7,8 @@ const senderStatusLabels: Record<string, string> = {
   CREATED: "Creado",
   INITIALIZING: "Inicializando",
   WAITING_QR: "Esperando QR",
+  AUTHENTICATING: "Autenticando",
+  CONNECTING: "Conectando",
   CONNECTED: "Conectado",
   SENDING: "Enviando",
   COOLDOWN: "En enfriamiento",

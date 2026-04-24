@@ -75,6 +75,7 @@ def update_sender_account(
 
 
 def reset_sender_session(db: Session, sender: SenderAccount) -> SenderAccount:
+    previous_session_key = sender.session.session_key if sender.session else None
     sender.status = SenderAccountStatus.WAITING_QR
     sender.phone_number = None
     new_session_key = f"sender-{sender.id}-{uuid4().hex[:8]}"
@@ -110,6 +111,8 @@ def reset_sender_session(db: Session, sender: SenderAccount) -> SenderAccount:
         session.restart_count += 1
         session.health_status = SenderSessionHealth.HEALTHY
         session.last_heartbeat_at = None
+    if previous_session_key:
+        delete_sender_auth_dir(previous_session_key)
     return sender
 
 

@@ -6,5 +6,6 @@ export interface MessageProvider {
   onDisconnect?(senderId: string, callback: () => void): void;
   clear?(senderId: string, destroyAuth?: boolean): Promise<void> | void;
   listSenderIds?(): string[];
+  getSessionKey?(senderId: string): string | null;
   getState?(senderId: string): Promise<string | null>;
 }

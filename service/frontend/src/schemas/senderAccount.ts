@@ -4,6 +4,8 @@ export const SenderAccountStatusSchema = z.enum([
   "CREATED",
   "INITIALIZING",
   "WAITING_QR",
+  "AUTHENTICATING",
+  "CONNECTING",
   "CONNECTED",
   "SENDING",
   "COOLDOWN",

@@ -3,6 +3,8 @@ import type { Client } from "whatsapp-web.js";
 
 import type { MessageProvider } from "../../domain/interfaces/message-provider.interface.js";
 import { AUTH_DATA_PATH, removeAuthSession } from "../../utils/auth.js";
+import { classifyWorkerError } from "../../utils/error-classifier.js";
+import type { WorkerEventBus } from "../../utils/worker-events.js";
 
 type SenderEntry = {
   sessionKey?: string;
@@ -11,11 +13,16 @@ type SenderEntry = {
   onReady?: (phoneNumber: string | null) => void;
   onDisconnect?: () => void;
   initializing?: boolean;
+  authenticatedHandled?: boolean;
+  readyHandled?: boolean;
+  clearing?: boolean;
 };
 
 // Adapter that isolates whatsapp-web.js usage behind MessageProvider.
 export class WhatsAppProvider implements MessageProvider {
   private clients = new Map<string, SenderEntry>();
+
+  constructor(private eventBus: WorkerEventBus) {}
 
   async initialize(senderId: string, sessionKey: string): Promise<void> {
     // Create or reuse a client for a sender and forward events to callbacks.
@@ -53,14 +60,37 @@ export class WhatsAppProvider implements MessageProvider {
     entry.initializing = true;
     entry.sessionKey = sessionKey;
     entry.client = client;
+    entry.authenticatedHandled = false;
+    entry.readyHandled = false;
+    entry.clearing = false;
     this.clients.set(senderId, entry);
+    this.eventBus.emit({
+      type: "sender.init.started",
+      payload: { senderId, sessionKey },
+    });
 
     client.on("qr", (qr: string) => {
-      console.log(`Provider QR event for sender ${senderId}`);
-      entry.onQr?.(qr);
+      this.eventBus.emit({
+        type: "sender.qr.generated",
+        payload: { senderId, sessionKey },
+      });
+      void Promise.resolve(entry.onQr?.(qr)).catch((error) => {
+        this.eventBus.emit({
+          type: "sender.init.failed",
+          payload: {
+            senderId,
+            sessionKey,
+            error,
+            category: classifyWorkerError(error),
+          },
+        });
+      });
     });
     client.on("ready", () => {
-      console.log(`Provider ready event for sender ${senderId}`);
+      if (entry.readyHandled) {
+        return;
+      }
+      entry.readyHandled = true;
       entry.initializing = false;
       const info = (client as any).info;
       const phone =
@@ -68,29 +98,84 @@ export class WhatsAppProvider implements MessageProvider {
         info?.me?.id?.user ??
         info?.me?.user ??
         null;
-      entry.onReady?.(phone);
+      this.eventBus.emit({
+        type: "sender.ready",
+        payload: { senderId, sessionKey },
+      });
+      void Promise.resolve(entry.onReady?.(phone)).catch((error) => {
+        this.eventBus.emit({
+          type: "sender.init.failed",
+          payload: {
+            senderId,
+            sessionKey,
+            error,
+            category: classifyWorkerError(error),
+          },
+        });
+      });
     });
     client.on("disconnected", (reason: string) => {
-      console.warn(`Provider disconnected for sender ${senderId}: ${reason}`);
       entry.initializing = false;
-      entry.onDisconnect?.();
+      if (entry.clearing) {
+        return;
+      }
+      this.eventBus.emit({
+        type: "sender.disconnected",
+        payload: { senderId, sessionKey, reason },
+      });
+      void Promise.resolve(entry.onDisconnect?.()).catch((error) => {
+        this.eventBus.emit({
+          type: "sender.init.failed",
+          payload: {
+            senderId,
+            sessionKey,
+            error,
+            reason,
+            category: classifyWorkerError(error),
+          },
+        });
+      });
       void this.clear(senderId, false);
     });
     client.on("auth_failure", (message: string) => {
-      console.error(`Provider auth failure for sender ${senderId}: ${message}`);
       entry.initializing = false;
+      this.eventBus.emit({
+        type: "sender.auth_failure",
+        payload: {
+          senderId,
+          sessionKey,
+          reason: message,
+          category: "auth_corrupt",
+        },
+      });
       void this.clear(senderId, false);
     });
     client.on("authenticated", () => {
-      console.log(`Provider authenticated event for sender ${senderId}`);
+      if (entry.authenticatedHandled) {
+        return;
+      }
+      entry.authenticatedHandled = true;
+      this.eventBus.emit({
+        type: "sender.authenticated",
+        payload: { senderId, sessionKey },
+      });
     });
     client.on("loading_screen", (percent: number, message: string) => {
-      console.log(
-        `Provider loading ${percent}% for sender ${senderId}: ${message}`
-      );
+      this.eventBus.emit({
+        type: "sender.state.changed",
+        payload: {
+          senderId,
+          sessionKey,
+          state: `LOADING_${percent}`,
+          reason: message,
+        },
+      });
     });
     client.on("change_state", (state: string) => {
-      console.log(`Provider state change for sender ${senderId}: ${state}`);
+      this.eventBus.emit({
+        type: "sender.state.changed",
+        payload: { senderId, sessionKey, state },
+      });
     });
     client.on("message", async (message: any) => {
       const body = String(message?.body ?? "").trim().toLowerCase();
@@ -102,13 +187,24 @@ export class WhatsAppProvider implements MessageProvider {
       }
     });
 
-    console.log(`Initializing WhatsApp client for sender ${senderId}`);
     try {
       await client.initialize();
-      console.log(`WhatsApp client initialize called for sender ${senderId}`);
+      this.eventBus.emit({
+        type: "sender.init.succeeded",
+        payload: { senderId, sessionKey },
+      });
     } catch (error) {
       entry.initializing = false;
-      console.error(`WhatsApp client failed to initialize for sender ${senderId}`, error);
+      await this.clear(senderId, false);
+      this.eventBus.emit({
+        type: "sender.init.failed",
+        payload: {
+          senderId,
+          sessionKey,
+          error,
+          category: classifyWorkerError(error),
+        },
+      });
       throw error;
     }
   }
@@ -122,10 +218,29 @@ export class WhatsAppProvider implements MessageProvider {
       throw new Error(`Sender ${senderId} is initializing`);
     }
     const recipient = normalizeRecipient(to);
-    if (recipient !== to) {
-      console.log(`Normalized recipient for sender ${senderId}: ${to} -> ${recipient}`);
+    this.eventBus.emit({
+      type: "sender.send.started",
+      payload: { senderId, sessionKey: entry.sessionKey, recipient },
+    });
+    try {
+      await entry.client.sendMessage(recipient, message);
+      this.eventBus.emit({
+        type: "sender.send.succeeded",
+        payload: { senderId, sessionKey: entry.sessionKey, recipient },
+      });
+    } catch (error) {
+      this.eventBus.emit({
+        type: "sender.send.failed",
+        payload: {
+          senderId,
+          sessionKey: entry.sessionKey,
+          recipient,
+          error,
+          category: classifyWorkerError(error),
+        },
+      });
+      throw error;
     }
-    await entry.client.sendMessage(recipient, message);
   }
 
   onQr(senderId: string, callback: (qr: string) => void): void {
@@ -152,6 +267,7 @@ export class WhatsAppProvider implements MessageProvider {
   async clear(senderId: string, destroyAuth = false): Promise<void> {
     const entry = this.clients.get(senderId);
     if (entry?.client) {
+      entry.clearing = true;
       try {
         await (entry.client as any).destroy();
       } catch (error) {
@@ -162,10 +278,22 @@ export class WhatsAppProvider implements MessageProvider {
       await removeAuthSession(entry.sessionKey);
     }
     this.clients.delete(senderId);
+    this.eventBus.emit({
+      type: "sender.client.cleared",
+      payload: {
+        senderId,
+        sessionKey: entry?.sessionKey,
+        reason: destroyAuth ? "client_and_auth_cleared" : "client_cleared",
+      },
+    });
   }
 
   listSenderIds(): string[] {
     return Array.from(this.clients.keys());
+  }
+
+  getSessionKey(senderId: string): string | null {
+    return this.clients.get(senderId)?.sessionKey ?? null;
   }
 
   async getState(senderId: string): Promise<string | null> {
@@ -180,7 +308,15 @@ export class WhatsAppProvider implements MessageProvider {
     try {
       return await clientAny.getState();
     } catch (error) {
-      console.warn(`Failed to get state for sender ${senderId}`, error);
+      this.eventBus.emit({
+        type: "sender.init.failed",
+        payload: {
+          senderId,
+          sessionKey: entry.sessionKey,
+          error,
+          category: classifyWorkerError(error),
+        },
+      });
       return null;
     }
   }
