@@ -167,5 +167,13 @@ jobs:
             docker compose build api wa-engine
             docker compose run --rm api alembic upgrade head
             docker compose up -d api wa-engine nginx
-            docker compose exec -T api python -c \"import urllib.request; r = urllib.request.urlopen('http://127.0.0.1:8000/health'); print(r.status); print(r.read().decode())\"
+            for attempt in 1 2 3 4 5 6 7 8 9 10; do
+              if docker compose exec -T api python -c \"import urllib.request; r = urllib.request.urlopen('http://127.0.0.1:8000/health'); print(r.status); print(r.read().decode())\"; then
+                exit 0
+              fi
+              echo 'API health check not ready yet, retrying...'
+              sleep 3
+            done
+            echo 'API health check failed after retries'
+            exit 1
           "
