@@ -1,0 +1,171 @@
+name: Relay Engine Deploy
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: relay-engine-deploy
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            service/frontend/package-lock.json
+            service/workers/whatsapp/package-lock.json
+
+      - name: Build frontend
+        working-directory: ./service/frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: service/frontend/dist
+          if-no-files-found: error
+
+      - name: Build wa-engine
+        working-directory: ./service/workers/whatsapp
+        run: |
+          npm ci
+          npm run build
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: service/backend/requirements.txt
+
+      - name: Install API dependencies
+        working-directory: ./service/backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Validate backend syntax
+        working-directory: ./service/backend
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          for path in Path("src").rglob("*.py"):
+              ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+
+          print("backend syntax ok")
+          PY
+
+      - name: Validate alembic revisions
+        working-directory: ./service/backend
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          revision_re = re.compile(r'^revision\s*=\s*["\']([^"\']+)["\']', re.MULTILINE)
+          down_revision_re = re.compile(r'^down_revision\s*=\s*["\']([^"\']+)["\']', re.MULTILINE)
+
+          revisions = {}
+          down_revisions = set()
+
+          for path in sorted(Path("alembic/versions").glob("*.py")):
+              text = path.read_text(encoding="utf-8")
+              revision_match = revision_re.search(text)
+              if not revision_match:
+                  raise SystemExit(f"Missing revision id in {path}")
+
+              revision = revision_match.group(1)
+              if revision.endswith(".py"):
+                  raise SystemExit(f"Invalid revision id in {path}: {revision}")
+              if len(revision) > 32:
+                  raise SystemExit(f"Revision id too long in {path}: {revision}")
+              if revision in revisions:
+                  raise SystemExit(f"Duplicate revision id {revision} in {path} and {revisions[revision]}")
+
+              revisions[revision] = str(path)
+
+              down_revision_match = down_revision_re.search(text)
+              if down_revision_match:
+                  down_revisions.add(down_revision_match.group(1))
+
+          missing = sorted(rev for rev in down_revisions if rev not in revisions and rev != "None")
+          if missing:
+              raise SystemExit(f"Missing down_revision targets: {missing}")
+
+          print("alembic revision graph looks consistent")
+          PY
+
+      - name: Validate docker compose config
+        run: |
+          cat > .env <<'EOF'
+          DB_USER=ci
+          DB_PASS=ci
+          DB_NAME=ci
+          DB_URL=postgresql://ci:ci@db:5432/ci
+          EOF
+          docker compose config -q
+
+  deploy:
+    needs: ci
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: service/frontend/dist
+
+      - name: Start ssh-agent and add key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_KEY }}
+
+      - name: Add VPS to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${{ secrets.HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Upload frontend dist to VPS
+        run: |
+          rsync -az --delete ./service/frontend/dist/ \
+            "${{ secrets.USERNAME }}@${{ secrets.HOST }}:${{ secrets.APP_DIR }}/service/frontend/dist/"
+
+      - name: Deploy to VPS
+        run: |
+          ssh "${{ secrets.USERNAME }}@${{ secrets.HOST }}" "
+            set -e
+            cd '${{ secrets.APP_DIR }}'
+            git pull --ff-only origin main
+            docker compose up -d db
+            docker compose build api wa-engine
+            docker compose run --rm api alembic upgrade head
+            docker compose up -d api wa-engine nginx
+            docker compose exec -T api python -c \"import urllib.request; r = urllib.request.urlopen('http://127.0.0.1:8000/health'); print(r.status); print(r.read().decode())\"
+          "
