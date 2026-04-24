@@ -73,11 +73,13 @@ async function bootstrap() {
   const campaignManager = new CampaignManager(
     provider,
     senderRepository,
+    senderLifecycleManager,
     messageRepository,
     campaignRepository,
     createLogger("CampaignManager"),
     worker.id,
-    sendLogRepository
+    sendLogRepository,
+    retryController
   );
   const recoveryManager = new RecoveryManager(
     messageRepository,

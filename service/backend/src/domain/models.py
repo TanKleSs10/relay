@@ -41,6 +41,7 @@ class MessageStatus(str, Enum):
 
 class SenderAccountStatus(str, Enum):
     CREATED = "CREATED"
+    IDLE = "IDLE"
     INITIALIZING = "INITIALIZING"
     WAITING_QR = "WAITING_QR"
     AUTHENTICATING = "AUTHENTICATING"

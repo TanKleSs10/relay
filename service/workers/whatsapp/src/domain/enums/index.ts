@@ -19,6 +19,7 @@ export enum MessageStatus {
 
 export enum SenderAccountStatus {
   CREATED = "CREATED",
+  IDLE = "IDLE",
   INITIALIZING = "INITIALIZING",
   WAITING_QR = "WAITING_QR",
   AUTHENTICATING = "AUTHENTICATING",

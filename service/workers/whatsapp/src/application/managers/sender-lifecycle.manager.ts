@@ -7,8 +7,6 @@ import type { Logger } from "../../utils/logger.js";
 import type { SenderRetryController } from "../../utils/sender-retry-controller.js";
 
 export class SenderLifecycleManager {
-  private initialized = new Set<string>();
-
   constructor(
     private provider: MessageProvider,
     private senderRepository: SenderRepository,
@@ -17,11 +15,6 @@ export class SenderLifecycleManager {
   ) {}
 
   ensureRegistered(senderId: string): void {
-    if (this.initialized.has(senderId)) {
-      return;
-    }
-    this.initialized.add(senderId);
-
     this.provider.onQr?.(senderId, async (qr) => {
       this.logger.info(`qr received for sender ${senderId}`);
       try {

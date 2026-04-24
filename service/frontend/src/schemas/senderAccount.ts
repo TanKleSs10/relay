@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const SenderAccountStatusSchema = z.enum([
   "CREATED",
+  "IDLE",
   "INITIALIZING",
   "WAITING_QR",
   "AUTHENTICATING",

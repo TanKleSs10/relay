@@ -15,6 +15,7 @@ import type { WorkerEventBus } from "../../utils/worker-events.js";
 
 const INITIALIZING_TIMEOUT_MS = 90_000;
 const ERROR_RECOVERY_DELAY_MS = 30_000;
+const IDLE_TIMEOUT_MS = 5 * 60_000;
 const IDLE_CONNECTED_CHECK_INTERVAL_MS = 120_000;
 const ACTIVE_CONNECTED_CHECK_INTERVAL_MS = 30_000;
 const SENDING_CHECK_INTERVAL_MS = 15_000;
@@ -70,6 +71,19 @@ export class SessionManager {
       : IDLE_MAX_STATE_CHECKS_PER_TICK;
 
     for (const sender of senders) {
+      if (
+        sender.status === SenderAccountStatus.CONNECTED &&
+        !hasActiveCampaign &&
+        this.shouldTransitionToIdle(sender)
+      ) {
+        this.logger.info(`sender ${sender.id} -> IDLE (inactive)`);
+        await this.provider.clear?.(sender.id, false);
+        await this.senderRepository.updateStatus(sender.id, SenderAccountStatus.IDLE);
+        this.resetUnknownState(sender.id);
+        this.lastStateCheckAt.delete(sender.id);
+        continue;
+      }
+
       if (shouldSyncProviderState(sender.status)) {
         if (
           stateChecksThisTick >= maxStateChecks ||
@@ -138,6 +152,10 @@ export class SessionManager {
       }
 
       this.resetUnknownState(sender.id);
+
+      if (sender.status === SenderAccountStatus.IDLE) {
+        continue;
+      }
 
       if (sender.status === SenderAccountStatus.ERROR) {
         if (
@@ -244,6 +262,20 @@ export class SessionManager {
     const lastCheckAt = this.lastStateCheckAt.get(sender.id) ?? 0;
     const interval = getStateCheckInterval(sender.status, hasActiveCampaign);
     return Date.now() - lastCheckAt >= interval;
+  }
+
+  private shouldTransitionToIdle(sender: SenderEntity): boolean {
+    if (!this.provider.listSenderIds?.().includes(sender.id)) {
+      return false;
+    }
+
+    const lastActivityAt = Math.max(
+      sender.lastSentAt?.getTime() ?? 0,
+      sender.lastSeenAt?.getTime() ?? 0,
+      sender.updatedAt.getTime()
+    );
+
+    return Date.now() - lastActivityAt >= IDLE_TIMEOUT_MS;
   }
 }
 

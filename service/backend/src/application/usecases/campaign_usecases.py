@@ -170,11 +170,15 @@ def dispatch_campaign(campaign_id: UUID, db: Session) -> dict[str, UUID]:
         raise ConflictError("Another campaign is already ACTIVE")
     available_sender = (
         db.query(SenderAccount)
-        .filter(SenderAccount.status == SenderAccountStatus.CONNECTED)
+        .filter(
+            SenderAccount.status.in_(
+                [SenderAccountStatus.CONNECTED, SenderAccountStatus.IDLE]
+            )
+        )
         .first()
     )
     if not available_sender:
-        raise ConflictError("No CONNECTED senders available")
+        raise ConflictError("No CONNECTED or IDLE senders available")
 
     try:
         campaign.status = CampaignStatus.ACTIVE
@@ -216,11 +220,15 @@ def retry_campaign(campaign_id: UUID, db: Session) -> dict[str, int]:
         raise ConflictError("Another campaign is already ACTIVE")
     available_sender = (
         db.query(SenderAccount)
-        .filter(SenderAccount.status == SenderAccountStatus.CONNECTED)
+        .filter(
+            SenderAccount.status.in_(
+                [SenderAccountStatus.CONNECTED, SenderAccountStatus.IDLE]
+            )
+        )
         .first()
     )
     if not available_sender:
-        raise ConflictError("No CONNECTED senders available")
+        raise ConflictError("No CONNECTED or IDLE senders available")
 
     try:
         reset_count = reset_messages_by_campaign(db, campaign_id)
