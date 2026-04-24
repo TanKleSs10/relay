@@ -6,7 +6,9 @@ type RequestOptions = {
   headers?: HeadersInit;
 };
 
-const baseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") || "";
+const baseUrl =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ||
+  "/api";
 
 function buildUrl(path: string) {
   if (!path.startsWith("/")) {
