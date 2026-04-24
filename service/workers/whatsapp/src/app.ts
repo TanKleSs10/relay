@@ -7,6 +7,7 @@ import { RecoveryManager } from "./application/managers/recovery.manager.js";
 import { CampaignManager } from "./application/managers/campaign.manager.js";
 import { QrManager } from "./application/managers/qr.manager.js";
 import { SessionManager } from "./application/managers/session.manager.js";
+import { SenderLifecycleManager } from "./application/managers/sender-lifecycle.manager.js";
 import { WorkerManager } from "./application/managers/worker.manager.js";
 import { connectDB } from "./infrastructure/db/connection.js";
 import { createMessageProvider } from "./infrastructure/providers/provider.factory.js";
@@ -16,6 +17,9 @@ import { SenderRepository } from "./infrastructure/repositories/sender.repositor
 import { SendLogRepository } from "./infrastructure/repositories/send-log.repository.js";
 import { WorkerRepository } from "./infrastructure/repositories/worker.repository.js";
 import { createLogger } from "./utils/logger.js";
+import { SenderRetryController } from "./utils/sender-retry-controller.js";
+import { attachWorkerEventLogger } from "./utils/worker-event-logger.js";
+import { WorkerEventBus } from "./utils/worker-events.js";
 
 const WORKER_NAME = "worker_whatsapp_1";
 const QR_INTERVAL_MS = 2000;
@@ -29,7 +33,11 @@ async function bootstrap() {
   logger.info("starting whatsapp worker");
 
   const pool = await connectDB();
-  const provider = createMessageProvider();
+  const eventBus = new WorkerEventBus();
+  const retryController = new SenderRetryController();
+  attachWorkerEventLogger(eventBus, createLogger("WorkerEvents"));
+  registerProcessGuards(eventBus);
+  const provider = createMessageProvider(eventBus);
 
   const workerRepository = new WorkerRepository(pool);
   const senderRepository = new SenderRepository(pool);
@@ -39,21 +47,39 @@ async function bootstrap() {
 
   const workerManager = new WorkerManager(workerRepository, createLogger("WorkerManager"));
   const worker = await workerManager.ensureWorker(WORKER_NAME);
+  const senderLifecycleManager = new SenderLifecycleManager(
+    provider,
+    senderRepository,
+    createLogger("SenderLifecycleManager"),
+    retryController
+  );
 
-  const qrManager = new QrManager(provider, senderRepository, createLogger("QrManager"));
+  const qrManager = new QrManager(
+    provider,
+    senderRepository,
+    senderLifecycleManager,
+    createLogger("QrManager"),
+    retryController
+  );
   const sessionManager = new SessionManager(
     provider,
     senderRepository,
-    createLogger("SessionManager")
+    senderLifecycleManager,
+    campaignRepository,
+    createLogger("SessionManager"),
+    retryController,
+    eventBus
   );
   const campaignManager = new CampaignManager(
     provider,
     senderRepository,
+    senderLifecycleManager,
     messageRepository,
     campaignRepository,
     createLogger("CampaignManager"),
     worker.id,
-    sendLogRepository
+    sendLogRepository,
+    retryController
   );
   const recoveryManager = new RecoveryManager(
     messageRepository,
@@ -95,3 +121,19 @@ bootstrap().catch((error) => {
   logger.error("fatal error during bootstrap", error);
   process.exitCode = 1;
 });
+
+function registerProcessGuards(eventBus: WorkerEventBus): void {
+  process.on("unhandledRejection", (error) => {
+    eventBus.emit({
+      type: "worker.unhandled_rejection",
+      payload: { error },
+    });
+  });
+
+  process.on("uncaughtException", (error) => {
+    eventBus.emit({
+      type: "worker.uncaught_exception",
+      payload: { error },
+    });
+  });
+}

@@ -1,6 +1,7 @@
 import type { MessageProvider } from "../../domain/interfaces/message-provider.interface.js";
 import { SenderAccountStatus } from "../../domain/enums/index.js";
 import type { SenderRepository } from "../../domain/interfaces/sender.repository.interface.js";
+import { SenderLifecycleManager } from "./sender-lifecycle.manager.js";
 import { CampaignRepository } from "../../infrastructure/repositories/campaign.repository.js";
 import {
   MessageRepository,
@@ -9,6 +10,7 @@ import {
 import { SendLogRepository } from "../../infrastructure/repositories/send-log.repository.js";
 import { randomDelay } from "../../utils/delay.js";
 import type { Logger } from "../../utils/logger.js";
+import type { SenderRetryController } from "../../utils/sender-retry-controller.js";
 
 const MAX_MESSAGES_PER_TICK = 12;
 const MAX_PER_SENDER_PER_TICK = 1;
@@ -19,6 +21,7 @@ const SLOW_DELAY_RANGE = { min: 500, max: 1200 };
 const MAX_CONSECUTIVE_FAILURES = 3;
 const MAX_INIT_RETRIES = 3;
 const PROCESSING_LOCK_WINDOW_MIN = 5;
+const MAX_IDLE_WAKEUPS_PER_TICK = 1;
 
 export class CampaignManager {
   private failureStreaks = new Map<string, number>();
@@ -32,11 +35,13 @@ export class CampaignManager {
   constructor(
     private provider: MessageProvider,
     private senderRepository: SenderRepository,
+    private lifecycleManager: SenderLifecycleManager,
     private messageRepository: MessageRepository,
     private campaignRepository: CampaignRepository,
     private logger: Logger,
     private workerId: string,
-    private sendLogRepository: SendLogRepository
+    private sendLogRepository: SendLogRepository,
+    private retryController: SenderRetryController
   ) {}
 
   async finishActiveCampaign(): Promise<void> {
@@ -68,21 +73,37 @@ export class CampaignManager {
         this.senderTotals.clear();
       }
 
-      const senders = await this.senderRepository.listByStatus(
-        SenderAccountStatus.CONNECTED
-      );
-      if (!senders.length) {
-        this.logger.warn(
-          `dispatch skip: no CONNECTED senders for campaign ${campaignId}`
-        );
-        return;
-      }
       const queuedCount = await this.messageRepository.countQueuedByCampaign(
         campaignId
       );
       const processingCount = await this.messageRepository.countProcessingByCampaign(
         campaignId
       );
+
+      if (this.cachedQueue.length === 0 && queuedCount === 0) {
+        this.logger.info(
+          `dispatch skip: no queued messages for campaign ${campaignId}`
+        );
+        await this.completeCampaign(campaignId);
+        return;
+      }
+
+      const wokenIdleSenders = await this.wakeIdleSenders(campaignId);
+      const senders = await this.senderRepository.listByStatus(
+        SenderAccountStatus.CONNECTED
+      );
+      if (!senders.length) {
+        if (wokenIdleSenders > 0) {
+          this.logger.info(
+            `dispatch waiting: ${wokenIdleSenders} IDLE senders waking up for campaign ${campaignId}`
+          );
+          return;
+        }
+        this.logger.warn(
+          `dispatch skip: no CONNECTED or IDLE senders ready for campaign ${campaignId}`
+        );
+        return;
+      }
       this.logger.info(
         `campaign ${campaignId} state: queued=${queuedCount}, processing=${processingCount}, senders_ready=${senders.length}`
       );
@@ -96,13 +117,6 @@ export class CampaignManager {
         this.logger.info(
           `reserved ${this.cachedQueue.length} queued messages for campaign ${campaignId}`
         );
-        if (!this.cachedQueue.length) {
-          this.logger.info(
-            `dispatch skip: no queued messages for campaign ${campaignId}`
-          );
-          await this.completeCampaign(campaignId);
-          return;
-        }
       }
 
       const senderLimit = Math.max(1, senders.length) * MAX_PER_SENDER_PER_TICK;
@@ -384,6 +398,46 @@ export class CampaignManager {
       this.logger.info(`campaign ${campaignId} marked FINISHED`);
     }
     this.logger.info(`campaign ${campaignId} completed`);
+  }
+
+  private async wakeIdleSenders(campaignId: string): Promise<number> {
+    const idleSenders = await this.senderRepository.listByStatus(
+      SenderAccountStatus.IDLE
+    );
+    if (!idleSenders.length) {
+      return 0;
+    }
+
+    let woken = 0;
+    for (const sender of idleSenders.slice(0, MAX_IDLE_WAKEUPS_PER_TICK)) {
+      if (!this.retryController.canAttempt(sender.id, sender.sessionKey)) {
+        continue;
+      }
+
+      this.logger.info(`waking IDLE sender ${sender.id} for campaign ${campaignId}`);
+      this.lifecycleManager.ensureRegistered(sender.id);
+      await this.senderRepository.updateStatus(
+        sender.id,
+        SenderAccountStatus.INITIALIZING
+      );
+
+      woken += 1;
+      void this.provider.initialize(sender.id, sender.sessionKey).catch(async (error) => {
+        const retryState = this.retryController.recordFailure(
+          sender.id,
+          sender.sessionKey
+        );
+        this.logger.error(`failed to wake IDLE sender ${sender.id}`, error);
+        this.logger.warn(
+          `sender ${sender.id} scheduled for retry in ${Math.ceil(
+            (retryState.nextRetryAt - Date.now()) / 1000
+          )}s after ${retryState.failures} init failures`
+        );
+        await this.senderRepository.updateStatus(sender.id, SenderAccountStatus.ERROR);
+      });
+    }
+
+    return woken;
   }
 }
 
