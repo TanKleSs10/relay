@@ -57,7 +57,7 @@ export class SenderRepository implements SenderRepositoryPort {
     return result.rows.map((row) => SenderEntity.fromRow(row));
   }
 
-  async listQrRequiredWithoutCode(): Promise<SenderEntity[]> {
+  async listQrRequested(): Promise<SenderEntity[]> {
     const result = await this.pool.query(
       `SELECT sa.id,
               ss.session_key,
@@ -75,11 +75,7 @@ export class SenderRepository implements SenderRepositoryPort {
        WHERE sa.status = ANY($1)
          AND ss.qr_code IS NULL
        ORDER BY sa.id DESC`,
-      [[
-        SenderAccountStatus.CREATED,
-        SenderAccountStatus.INITIALIZING,
-        SenderAccountStatus.WAITING_QR,
-      ]]
+      [[SenderAccountStatus.QR_REQUESTED]]
     );
     return result.rows.map((row) => SenderEntity.fromRow(row));
   }
@@ -108,7 +104,7 @@ export class SenderRepository implements SenderRepositoryPort {
     const sessionKey = `sender-${senderId}-${crypto.randomUUID().slice(0, 8)}`;
     await this.pool.query(
       "UPDATE sender_accounts SET status = $2, phone_number = NULL, updated_at = NOW() WHERE id = $1",
-      [senderId, SenderAccountStatus.WAITING_QR]
+      [senderId, SenderAccountStatus.QR_REQUESTED]
     );
     await this.pool.query(
       `INSERT INTO sender_sessions (sender_account_id, session_key, qr_code, qr_generated_at)
@@ -120,6 +116,24 @@ export class SenderRepository implements SenderRepositoryPort {
     const row = await this.findById(senderId);
     if (!row) {
       throw new Error(`Sender account ${senderId} not found for reset`);
+    }
+    return row;
+  }
+
+  async markQrInactive(senderId: string): Promise<SenderEntity> {
+    await this.pool.query(
+      "UPDATE sender_accounts SET status = $2, updated_at = NOW() WHERE id = $1",
+      [senderId, SenderAccountStatus.QR_INACTIVE]
+    );
+    await this.pool.query(
+      `UPDATE sender_sessions
+       SET qr_code = NULL, qr_generated_at = NULL, updated_at = NOW()
+       WHERE sender_account_id = $1`,
+      [senderId]
+    );
+    const row = await this.findById(senderId);
+    if (!row) {
+      throw new Error(`Sender account ${senderId} not found for QR inactive update`);
     }
     return row;
   }

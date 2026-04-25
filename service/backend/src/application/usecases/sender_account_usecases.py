@@ -10,6 +10,7 @@ from src.api.service.sender_accounts import (
     delete_sender_account,
     get_sender_account_by_id,
     list_sender_accounts,
+    request_sender_qr,
     reset_sender_session,
     update_sender_account,
 )
@@ -72,6 +73,20 @@ def reset_sender(sender_id: UUID, db: Session) -> SenderAccount:
         raise NotFoundError("Sender account not found")
     try:
         sender = reset_sender_session(db, sender)
+        db.commit()
+        db.refresh(sender)
+        return sender
+    except Exception as exc:
+        db.rollback()
+        raise exc
+
+
+def request_sender_qr_code(sender_id: UUID, db: Session) -> SenderAccount:
+    sender = get_sender_account_by_id(db, sender_id)
+    if not sender:
+        raise NotFoundError("Sender account not found")
+    try:
+        sender = request_sender_qr(db, sender)
         db.commit()
         db.refresh(sender)
         return sender

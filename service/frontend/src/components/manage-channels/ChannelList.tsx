@@ -7,7 +7,9 @@ const senderStatusLabels: Record<string, string> = {
   CREATED: "Creado",
   IDLE: "Inactivo",
   INITIALIZING: "Inicializando",
+  QR_REQUESTED: "Solicitando QR",
   WAITING_QR: "Esperando QR",
+  QR_INACTIVE: "QR inactivo",
   AUTHENTICATING: "Autenticando",
   CONNECTING: "Conectando",
   CONNECTED: "Conectado",
@@ -43,6 +45,12 @@ export function ChannelList({ channels, onViewQr, onEdit, onResetSession, onDele
         const statusClass = `channel-status--${String(sender.status || "")
           .toLowerCase()
           .replace("_", "-")}`;
+        const canViewQr = [
+          "CREATED",
+          "QR_REQUESTED",
+          "WAITING_QR",
+          "QR_INACTIVE",
+        ].includes(sender.status);
         return (
           <article key={sender.id} className="channel-row">
             <div className="channel-row__main">
@@ -64,7 +72,7 @@ export function ChannelList({ channels, onViewQr, onEdit, onResetSession, onDele
               <Button
                 size="small"
                 variant="tertiary"
-                disabled={sender.status !== "WAITING_QR"}
+                disabled={!canViewQr}
                 onClick={() => onViewQr(sender)}
               >
                 Ver QR

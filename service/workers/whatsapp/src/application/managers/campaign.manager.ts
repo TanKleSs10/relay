@@ -22,6 +22,8 @@ const MAX_CONSECUTIVE_FAILURES = 3;
 const MAX_INIT_RETRIES = 3;
 const PROCESSING_LOCK_WINDOW_MIN = 5;
 const MAX_IDLE_WAKEUPS_PER_TICK = 1;
+const MAX_LIVE_SESSIONS = 1;
+const LIVE_SESSION_LIMIT_LOG_INTERVAL_MS = 15_000;
 
 export class CampaignManager {
   private failureStreaks = new Map<string, number>();
@@ -30,6 +32,7 @@ export class CampaignManager {
   private roundRobinIndex = 0;
   private sentKeys = new Set<string>();
   private lastNoActiveLogAt = 0;
+  private lastLiveLimitLogAt = 0;
   private senderTotals = new Map<string, number>();
 
   constructor(
@@ -401,6 +404,26 @@ export class CampaignManager {
   }
 
   private async wakeIdleSenders(campaignId: string): Promise<number> {
+    const liveSessionCount = this.provider.listSenderIds?.().length ?? 0;
+    if (liveSessionCount >= MAX_LIVE_SESSIONS) {
+      const now = Date.now();
+      if (now - this.lastLiveLimitLogAt >= LIVE_SESSION_LIMIT_LOG_INTERVAL_MS) {
+        this.logger.info(
+          `campaign ${campaignId} wakeup skip: live session limit reached (${liveSessionCount}/${MAX_LIVE_SESSIONS})`
+        );
+        this.lastLiveLimitLogAt = now;
+      }
+      return 0;
+    }
+
+    const availableSlots = Math.min(
+      MAX_IDLE_WAKEUPS_PER_TICK,
+      MAX_LIVE_SESSIONS - liveSessionCount
+    );
+    if (availableSlots <= 0) {
+      return 0;
+    }
+
     const idleSenders = await this.senderRepository.listByStatus(
       SenderAccountStatus.IDLE
     );
@@ -409,12 +432,14 @@ export class CampaignManager {
     }
 
     let woken = 0;
-    for (const sender of idleSenders.slice(0, MAX_IDLE_WAKEUPS_PER_TICK)) {
+    for (const sender of idleSenders.slice(0, availableSlots)) {
       if (!this.retryController.canAttempt(sender.id, sender.sessionKey)) {
         continue;
       }
 
-      this.logger.info(`waking IDLE sender ${sender.id} for campaign ${campaignId}`);
+      this.logger.info(
+        `waking IDLE sender ${sender.id} for campaign ${campaignId} (${liveSessionCount + woken + 1}/${MAX_LIVE_SESSIONS})`
+      );
       this.lifecycleManager.ensureRegistered(sender.id);
       await this.senderRepository.updateStatus(
         sender.id,

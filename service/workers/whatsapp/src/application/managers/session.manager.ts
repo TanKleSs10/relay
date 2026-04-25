@@ -15,7 +15,9 @@ import type { WorkerEventBus } from "../../utils/worker-events.js";
 
 const INITIALIZING_TIMEOUT_MS = 90_000;
 const ERROR_RECOVERY_DELAY_MS = 30_000;
-const IDLE_TIMEOUT_MS = 5 * 60_000;
+const IDLE_TIMEOUT_MS = 10 * 60_000;
+const POST_SEND_KEEPALIVE_MS = 5 * 60_000;
+const QR_ACTIVE_TIMEOUT_MS = 3 * 60_000;
 const IDLE_CONNECTED_CHECK_INTERVAL_MS = 120_000;
 const ACTIVE_CONNECTED_CHECK_INTERVAL_MS = 30_000;
 const SENDING_CHECK_INTERVAL_MS = 15_000;
@@ -71,6 +73,15 @@ export class SessionManager {
       : IDLE_MAX_STATE_CHECKS_PER_TICK;
 
     for (const sender of senders) {
+      if (sender.status === SenderAccountStatus.WAITING_QR) {
+        if (isQrExpired(sender)) {
+          this.logger.info(`sender ${sender.id} -> QR_INACTIVE (qr timeout)`);
+          await this.provider.clear?.(sender.id, false);
+          await this.senderRepository.markQrInactive(sender.id);
+        }
+        continue;
+      }
+
       if (
         sender.status === SenderAccountStatus.CONNECTED &&
         !hasActiveCampaign &&
@@ -108,9 +119,9 @@ export class SessionManager {
         }
 
         if (nextStatus === SenderAccountStatus.WAITING_QR) {
-          this.logger.warn(`sender ${sender.id} -> WAITING_QR (${state})`);
-          await this.senderRepository.updateStatus(sender.id, nextStatus);
+          this.logger.warn(`sender ${sender.id} -> QR_INACTIVE (${state})`);
           await this.provider.clear?.(sender.id);
+          await this.senderRepository.markQrInactive(sender.id);
           await cleanupAuthState(sender.sessionKey, this.logger);
           continue;
         }
@@ -269,11 +280,14 @@ export class SessionManager {
       return false;
     }
 
-    const lastActivityAt = Math.max(
-      sender.lastSentAt?.getTime() ?? 0,
-      sender.lastSeenAt?.getTime() ?? 0,
-      sender.updatedAt.getTime()
-    );
+    if (
+      sender.lastSentAt &&
+      Date.now() - sender.lastSentAt.getTime() < POST_SEND_KEEPALIVE_MS
+    ) {
+      return false;
+    }
+
+    const lastActivityAt = getLastActivityAt(sender);
 
     return Date.now() - lastActivityAt >= IDLE_TIMEOUT_MS;
   }
@@ -292,6 +306,19 @@ async function cleanupAuthState(sessionKey: string, logger: Logger): Promise<voi
 
 function isInitializingTimedOut(sender: SenderEntity): boolean {
   return Date.now() - sender.updatedAt.getTime() >= INITIALIZING_TIMEOUT_MS;
+}
+
+function isQrExpired(sender: SenderEntity): boolean {
+  const qrStartedAt = sender.qrGeneratedAt ?? sender.updatedAt;
+  return Date.now() - qrStartedAt.getTime() >= QR_ACTIVE_TIMEOUT_MS;
+}
+
+function getLastActivityAt(sender: SenderEntity): number {
+  return Math.max(
+    sender.lastSentAt?.getTime() ?? 0,
+    sender.lastSeenAt?.getTime() ?? 0,
+    sender.updatedAt.getTime()
+  );
 }
 
 function hasErrorRecoveryDelayElapsed(sender: SenderEntity): boolean {

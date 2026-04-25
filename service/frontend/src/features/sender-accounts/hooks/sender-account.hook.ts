@@ -6,10 +6,15 @@ import {
   getSenderAccount,
   getSenderQr,
   listSenderAccounts,
+  requestSenderQr,
   resetSenderSession,
   updateSenderAccount,
 } from "../api/sender-account.api";
-import type { SenderAccountCreatePayload, SenderAccountUpdatePayload } from "../sender-account.types";
+import type {
+  SenderAccount,
+  SenderAccountCreatePayload,
+  SenderAccountUpdatePayload,
+} from "../sender-account.types";
 
 export const senderAccountKeys = {
   all: ["sender-accounts"] as const,
@@ -18,11 +23,27 @@ export const senderAccountKeys = {
   qr: (senderId: string) => [...senderAccountKeys.all, "qr", senderId] as const,
 };
 
+const TRANSITIONAL_SENDER_STATUSES = new Set([
+  "INITIALIZING",
+  "QR_REQUESTED",
+  "WAITING_QR",
+  "AUTHENTICATING",
+  "CONNECTING",
+  "SENDING",
+]);
+
+const SENDER_LIST_IDLE_REFETCH_MS = 15_000;
+const SENDER_LIST_ACTIVE_REFETCH_MS = 4_000;
+const QR_REFETCH_MS = 5_000;
+
 export const useSenderAccounts = () =>
   useQuery({
     queryKey: senderAccountKeys.list(),
     queryFn: listSenderAccounts,
-    refetchInterval: 3000,
+    refetchInterval: (query) =>
+      shouldRefetchSendersFrequently(query.state.data)
+        ? SENDER_LIST_ACTIVE_REFETCH_MS
+        : SENDER_LIST_IDLE_REFETCH_MS,
   });
 
 export const useSenderAccount = (senderId: string) =>
@@ -32,12 +53,19 @@ export const useSenderAccount = (senderId: string) =>
     enabled: senderId.length > 0,
   });
 
-export const useSenderQr = (senderId: string, enabled = true) =>
+export const useSenderQr = (
+  senderId: string,
+  senderStatus?: SenderAccount["status"],
+  enabled = true
+) =>
   useQuery({
     queryKey: senderAccountKeys.qr(senderId),
     queryFn: () => getSenderQr(senderId),
     enabled: enabled && senderId.length > 0,
-    refetchInterval: enabled ? 5000 : false,
+    refetchInterval:
+      enabled && shouldPollQr(senderStatus)
+        ? QR_REFETCH_MS
+        : false,
   });
 
 export const useCreateSenderAccount = () =>
@@ -55,6 +83,11 @@ export const useResetSenderSession = () =>
     mutationFn: (senderId: string) => resetSenderSession(senderId),
   });
 
+export const useRequestSenderQr = () =>
+  useMutation({
+    mutationFn: (senderId: string) => requestSenderQr(senderId),
+  });
+
 export const useUpdateSenderAccount = () =>
   useMutation({
     mutationFn: ({
@@ -65,3 +98,18 @@ export const useUpdateSenderAccount = () =>
       payload: SenderAccountUpdatePayload;
     }) => updateSenderAccount(senderId, payload),
   });
+
+function shouldRefetchSendersFrequently(senders: SenderAccount[] | undefined): boolean {
+  if (!senders?.length) {
+    return false;
+  }
+
+  return senders.some((sender) => TRANSITIONAL_SENDER_STATUSES.has(sender.status));
+}
+
+function shouldPollQr(senderStatus: SenderAccount["status"] | undefined): boolean {
+  return (
+    senderStatus === "QR_REQUESTED" ||
+    senderStatus === "WAITING_QR"
+  );
+}
