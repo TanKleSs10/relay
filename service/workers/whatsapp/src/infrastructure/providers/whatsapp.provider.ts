@@ -1,7 +1,10 @@
 import whatsapp from "whatsapp-web.js";
 import type { Client } from "whatsapp-web.js";
 
-import type { MessageProvider } from "../../domain/interfaces/message-provider.interface.js";
+import type {
+  MessageProvider,
+  OutboundMedia,
+} from "../../domain/interfaces/message-provider.interface.js";
 import { AUTH_DATA_PATH, removeAuthSession } from "../../utils/auth.js";
 import { classifyWorkerError } from "../../utils/error-classifier.js";
 import type { WorkerEventBus } from "../../utils/worker-events.js";
@@ -209,7 +212,12 @@ export class WhatsAppProvider implements MessageProvider {
     }
   }
 
-  async sendMessage(senderId: string, to: string, message: string): Promise<void> {
+  async sendMessage(
+    senderId: string,
+    to: string,
+    message: string,
+    media: OutboundMedia[] = []
+  ): Promise<void> {
     const entry = this.clients.get(senderId);
     if (!entry?.client) {
       throw new Error(`Sender ${senderId} is not initialized`);
@@ -223,7 +231,22 @@ export class WhatsAppProvider implements MessageProvider {
       payload: { senderId, sessionKey: entry.sessionKey, recipient },
     });
     try {
-      await entry.client.sendMessage(recipient, message);
+      if (media.length === 0) {
+        await entry.client.sendMessage(recipient, message);
+      } else {
+        const MessageMedia = (whatsapp as any).MessageMedia;
+        for (const [index, item] of media.entries()) {
+          const outboundMedia = await MessageMedia.fromUrl(item.url, {
+            filename: item.filename ?? undefined,
+            unsafeMime: true,
+          });
+          const options =
+            index === 0 && message.trim()
+              ? { caption: message }
+              : undefined;
+          await entry.client.sendMessage(recipient, outboundMedia, options);
+        }
+      }
       this.eventBus.emit({
         type: "sender.send.succeeded",
         payload: { senderId, sessionKey: entry.sessionKey, recipient },

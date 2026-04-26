@@ -1,6 +1,16 @@
+export type OutboundMedia = {
+  url: string;
+  filename?: string | null;
+};
+
 export interface MessageProvider {
   initialize(senderId: string, sessionKey: string): Promise<void>;
-  sendMessage(senderId: string, to: string, message: string): Promise<void>;
+  sendMessage(
+    senderId: string,
+    to: string,
+    message: string,
+    media?: OutboundMedia[]
+  ): Promise<void>;
   onQr?(senderId: string, callback: (qr: string) => void): void;
   onReady?(senderId: string, callback: (phoneNumber: string | null) => void): void;
   onDisconnect?(senderId: string, callback: () => void): void;
