@@ -153,6 +153,10 @@ Reducir consumo de RAM/CPU activando sesiones solo cuando realmente se usan.
 - no todos los senders mantienen Chromium vivo
 - un sender puede activarse bajo demanda y apagarse al quedar inactivo
 
+## Referencias
+
+- [Diseño teórico de Fase 2](./phase-2-session-lifecycle.md)
+
 ---
 
 # Fase 3. Recuperación y consistencia de sesión

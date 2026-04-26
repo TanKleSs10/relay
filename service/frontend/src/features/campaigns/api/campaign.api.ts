@@ -1,5 +1,10 @@
 import { downloadFile, request } from "../../../api";
-import type { Campaign, CampaignMetrics, CampaignUploadSummary } from "../campaign.types";
+import type {
+  Campaign,
+  CampaignMediaAsset,
+  CampaignMetrics,
+  CampaignUploadSummary,
+} from "../campaign.types";
 
 export function listCampaigns() {
   return request<Campaign[]>("/campaigns");
@@ -34,6 +39,26 @@ export function uploadCampaign(formData: FormData) {
     method: "POST",
     headers: {},
     body: formData,
+  });
+}
+
+export function listCampaignMedia(campaignId: string) {
+  return request<CampaignMediaAsset[]>(`/campaigns/${campaignId}/media`);
+}
+
+export function uploadCampaignMedia(campaignId: string, file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+  return request<CampaignMediaAsset>(`/campaigns/${campaignId}/media`, {
+    method: "POST",
+    headers: {},
+    body: formData,
+  });
+}
+
+export function deleteCampaignMedia(campaignId: string, mediaAssetId: string) {
+  return request(`/campaigns/${campaignId}/media/${mediaAssetId}`, {
+    method: "DELETE",
   });
 }
 

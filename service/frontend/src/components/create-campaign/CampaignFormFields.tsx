@@ -3,6 +3,7 @@ import type { FieldErrors, UseFormRegister } from "react-hook-form";
 type FormValues = {
   name: string;
   file: FileList;
+  images?: FileList;
 };
 
 type Props = {
@@ -39,6 +40,21 @@ export function CampaignFormFields({ register, errors }: Props) {
           {...register("file")}
         />
         {errors.file ? <p className="error-message">{errors.file.message}</p> : null}
+      </div>
+      <div className="campaign-form__group">
+        <label htmlFor="images" className="campaign-form__label">
+          Imágenes opcionales{" "}
+          <span className="campaign-form__hint">(hasta 5: jpg, png, webp)</span>
+        </label>
+        <input
+          type="file"
+          id="images"
+          className="campaign-form__input"
+          accept="image/jpeg,image/png,image/webp"
+          multiple
+          {...register("images")}
+        />
+        {errors.images ? <p className="error-message">{errors.images.message}</p> : null}
       </div>
     </>
   );

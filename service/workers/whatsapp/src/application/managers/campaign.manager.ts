@@ -1,8 +1,12 @@
-import type { MessageProvider } from "../../domain/interfaces/message-provider.interface.js";
+import type {
+  MessageProvider,
+  OutboundMedia,
+} from "../../domain/interfaces/message-provider.interface.js";
 import { SenderAccountStatus } from "../../domain/enums/index.js";
 import type { SenderRepository } from "../../domain/interfaces/sender.repository.interface.js";
 import { SenderLifecycleManager } from "./sender-lifecycle.manager.js";
 import { CampaignRepository } from "../../infrastructure/repositories/campaign.repository.js";
+import { CampaignMediaRepository } from "../../infrastructure/repositories/campaign-media.repository.js";
 import {
   MessageRepository,
   type MessageRow,
@@ -22,6 +26,8 @@ const MAX_CONSECUTIVE_FAILURES = 3;
 const MAX_INIT_RETRIES = 3;
 const PROCESSING_LOCK_WINDOW_MIN = 5;
 const MAX_IDLE_WAKEUPS_PER_TICK = 1;
+const MAX_LIVE_SESSIONS = 1;
+const LIVE_SESSION_LIMIT_LOG_INTERVAL_MS = 15_000;
 
 export class CampaignManager {
   private failureStreaks = new Map<string, number>();
@@ -30,7 +36,9 @@ export class CampaignManager {
   private roundRobinIndex = 0;
   private sentKeys = new Set<string>();
   private lastNoActiveLogAt = 0;
+  private lastLiveLimitLogAt = 0;
   private senderTotals = new Map<string, number>();
+  private cachedMedia: OutboundMedia[] | null = null;
 
   constructor(
     private provider: MessageProvider,
@@ -38,6 +46,7 @@ export class CampaignManager {
     private lifecycleManager: SenderLifecycleManager,
     private messageRepository: MessageRepository,
     private campaignRepository: CampaignRepository,
+    private campaignMediaRepository: CampaignMediaRepository,
     private logger: Logger,
     private workerId: string,
     private sendLogRepository: SendLogRepository,
@@ -68,6 +77,7 @@ export class CampaignManager {
       if (this.cachedCampaignId !== campaignId) {
         this.cachedCampaignId = campaignId;
         this.cachedQueue = [];
+        this.cachedMedia = null;
         this.roundRobinIndex = 0;
         this.sentKeys.clear();
         this.senderTotals.clear();
@@ -117,6 +127,17 @@ export class CampaignManager {
         this.logger.info(
           `reserved ${this.cachedQueue.length} queued messages for campaign ${campaignId}`
         );
+      }
+
+      if (this.cachedMedia === null) {
+        this.cachedMedia = await this.campaignMediaRepository.listByCampaign(
+          campaignId
+        );
+        if (this.cachedMedia.length > 0) {
+          this.logger.info(
+            `campaign ${campaignId} loaded ${this.cachedMedia.length} media assets`
+          );
+        }
       }
 
       const senderLimit = Math.max(1, senders.length) * MAX_PER_SENDER_PER_TICK;
@@ -202,7 +223,11 @@ export class CampaignManager {
           );
           continue;
         }
-        const result = await this.sendWithSender(sender.id, message);
+        const result = await this.sendWithSender(
+          sender.id,
+          message,
+          this.cachedMedia
+        );
         if (result.sent) {
           this.failureStreaks.set(sender.id, 0);
           this.sentKeys.add(dedupeKey);
@@ -242,7 +267,8 @@ export class CampaignManager {
 
   private async sendWithSender(
     senderId: string,
-    message: MessageRow
+    message: MessageRow,
+    media: OutboundMedia[]
   ): Promise<{ sent: boolean; avoidCooldown: boolean }> {
     try {
       await this.senderRepository.updateStatus(
@@ -267,7 +293,17 @@ export class CampaignManager {
         );
         return { sent: true, avoidCooldown: false };
       }
-      await this.provider.sendMessage(senderId, message.recipient, message.content);
+      if (media.length > 0) {
+        this.logger.info(
+          `sending message ${message.id} with ${media.length} media assets via sender ${senderId}`
+        );
+      }
+      await this.provider.sendMessage(
+        senderId,
+        message.recipient,
+        message.content,
+        media
+      );
       await this.messageRepository.markSent(message.id, senderId);
       await this.sendLogRepository.create({
         messageId: message.id,
@@ -401,6 +437,26 @@ export class CampaignManager {
   }
 
   private async wakeIdleSenders(campaignId: string): Promise<number> {
+    const liveSessionCount = this.provider.listSenderIds?.().length ?? 0;
+    if (liveSessionCount >= MAX_LIVE_SESSIONS) {
+      const now = Date.now();
+      if (now - this.lastLiveLimitLogAt >= LIVE_SESSION_LIMIT_LOG_INTERVAL_MS) {
+        this.logger.info(
+          `campaign ${campaignId} wakeup skip: live session limit reached (${liveSessionCount}/${MAX_LIVE_SESSIONS})`
+        );
+        this.lastLiveLimitLogAt = now;
+      }
+      return 0;
+    }
+
+    const availableSlots = Math.min(
+      MAX_IDLE_WAKEUPS_PER_TICK,
+      MAX_LIVE_SESSIONS - liveSessionCount
+    );
+    if (availableSlots <= 0) {
+      return 0;
+    }
+
     const idleSenders = await this.senderRepository.listByStatus(
       SenderAccountStatus.IDLE
     );
@@ -409,12 +465,14 @@ export class CampaignManager {
     }
 
     let woken = 0;
-    for (const sender of idleSenders.slice(0, MAX_IDLE_WAKEUPS_PER_TICK)) {
+    for (const sender of idleSenders.slice(0, availableSlots)) {
       if (!this.retryController.canAttempt(sender.id, sender.sessionKey)) {
         continue;
       }
 
-      this.logger.info(`waking IDLE sender ${sender.id} for campaign ${campaignId}`);
+      this.logger.info(
+        `waking IDLE sender ${sender.id} for campaign ${campaignId} (${liveSessionCount + woken + 1}/${MAX_LIVE_SESSIONS})`
+      );
       this.lifecycleManager.ensureRegistered(sender.id);
       await this.senderRepository.updateStatus(
         sender.id,

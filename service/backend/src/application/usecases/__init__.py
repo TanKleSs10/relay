@@ -14,6 +14,11 @@ from src.application.usecases.sender_account_usecases import (
     remove_sender,
     update_sender,
 )
+from src.application.usecases.media_asset_usecases import (
+    list_campaign_media,
+    remove_campaign_media,
+    upload_campaign_media,
+)
 
 __all__ = [
     "create_campaign_with_file",
@@ -26,6 +31,9 @@ __all__ = [
     "create_sender",
     "get_sender",
     "list_senders",
+    "list_campaign_media",
     "remove_sender",
+    "remove_campaign_media",
+    "upload_campaign_media",
     "update_sender",
 ]

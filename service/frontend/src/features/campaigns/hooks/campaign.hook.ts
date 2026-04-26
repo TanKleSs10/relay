@@ -2,20 +2,24 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 
 import {
   deleteCampaign,
+  deleteCampaignMedia,
   downloadCampaignMessagesReport,
   dispatchCampaign,
   getCampaign,
   getCampaignMetrics,
+  listCampaignMedia,
   listCampaigns,
   pauseCampaign,
   retryCampaign,
   uploadCampaign,
+  uploadCampaignMedia,
 } from "../api/campaign.api";
 
 export const campaignKeys = {
   all: ["campaigns"] as const,
   list: () => [...campaignKeys.all, "list"] as const,
   detail: (campaignId: string) => [...campaignKeys.all, "detail", campaignId] as const,
+  media: (campaignId: string) => [...campaignKeys.detail(campaignId), "media"] as const,
 };
 
 export const useCampaigns = () =>
@@ -38,6 +42,13 @@ export const useCampaignMetrics = (campaignId: string) =>
     queryFn: () => getCampaignMetrics(campaignId),
     enabled: campaignId.length > 0,
     refetchInterval: 5000,
+  });
+
+export const useCampaignMedia = (campaignId: string) =>
+  useQuery({
+    queryKey: campaignKeys.media(campaignId),
+    queryFn: () => listCampaignMedia(campaignId),
+    enabled: campaignId.length > 0,
   });
 
 export const useDeleteCampaign = () =>
@@ -63,6 +74,28 @@ export const useRetryCampaign = () =>
 export const useUploadCampaign = () =>
   useMutation({
     mutationFn: (formData: FormData) => uploadCampaign(formData),
+  });
+
+export const useUploadCampaignMedia = () =>
+  useMutation({
+    mutationFn: ({
+      campaignId,
+      file,
+    }: {
+      campaignId: string;
+      file: File;
+    }) => uploadCampaignMedia(campaignId, file),
+  });
+
+export const useDeleteCampaignMedia = () =>
+  useMutation({
+    mutationFn: ({
+      campaignId,
+      mediaAssetId,
+    }: {
+      campaignId: string;
+      mediaAssetId: string;
+    }) => deleteCampaignMedia(campaignId, mediaAssetId),
   });
 
 export const useDownloadCampaignMessagesReport = () =>

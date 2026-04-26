@@ -13,6 +13,7 @@ import {
   useCreateSenderAccount,
   useDeleteSenderAccount,
   useMe,
+  useRequestSenderQr,
   useResetSenderSession,
   useSenderAccounts,
   useSenderQr,
@@ -28,6 +29,7 @@ export function ManageChannelsPage() {
   const createSender = useCreateSenderAccount();
   const updateSender = useUpdateSenderAccount();
   const deleteSender = useDeleteSenderAccount();
+  const requestSenderQr = useRequestSenderQr();
   const resetSession = useResetSenderSession();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newLabel, setNewLabel] = useState("");
@@ -35,7 +37,6 @@ export function ManageChannelsPage() {
   const [editLabel, setEditLabel] = useState("");
   const [qrModalSender, setQrModalSender] = useState<SenderAccount | null>(null);
   const qrSenderId = qrModalSender?.id ?? "";
-  const { data: qrData } = useSenderQr(qrSenderId, Boolean(qrModalSender));
   const { data: user } = useMe();
   const isAdmin = (user?.roles ?? []).includes("ADMIN");
   const hasReachedSenderLimit = channels.length >= MAX_SENDERS;
@@ -43,6 +44,14 @@ export function ManageChannelsPage() {
   const modalSender = qrModalSender
     ? channels.find((item) => item.id === qrModalSender.id) || qrModalSender
     : null;
+  const qrModalStatus = modalSender?.status;
+  const { data: qrData } = useSenderQr(
+    qrSenderId,
+    qrModalStatus,
+    Boolean(qrModalSender)
+  );
+  const isRequestingModalQr =
+    requestSenderQr.isPending && requestSenderQr.variables === qrSenderId;
 
   return (
     <>
@@ -89,7 +98,22 @@ export function ManageChannelsPage() {
           ) : (
             <ChannelList
               channels={channels}
-              onViewQr={(sender) => setQrModalSender(sender)}
+              onViewQr={(sender) => {
+                setQrModalSender(sender);
+                if (["CREATED", "QR_INACTIVE"].includes(sender.status)) {
+                  requestSenderQr.mutate(sender.id, {
+                    onSuccess: () => {
+                      queryClient.invalidateQueries({ queryKey: ["sender-accounts"] });
+                      queryClient.invalidateQueries({
+                        queryKey: ["sender-accounts", "qr", sender.id],
+                      });
+                    },
+                    onError: () => {
+                      toast.error("No se pudo solicitar el QR");
+                    },
+                  });
+                }
+              }}
               onEdit={(sender) => {
                 setEditSender(sender);
                 setEditLabel(sender.label);
@@ -128,13 +152,19 @@ export function ManageChannelsPage() {
             <img className="modal__image" src={qrData.qr_code} alt="QR del canal" />
           ) : (
             <div className="modal__image u-flex u-flex-center u-color-meta">
-              Sin QR disponible
+              {isRequestingModalQr || modalSender?.status === "QR_REQUESTED"
+                ? "Generando QR..."
+                : "Sin QR disponible"}
             </div>
           )}
           <p className="modal__text">
             {qrData?.qr_code
               ? "Escanea este QR para conectar el canal."
-              : "Este canal no tiene QR disponible todavía."}
+              : isRequestingModalQr || modalSender?.status === "QR_REQUESTED"
+                ? "Preparando un QR nuevo para este canal."
+                : modalSender?.status === "QR_INACTIVE"
+                  ? "Este canal requiere un nuevo QR. Usa este modal para volver a solicitarlo."
+                  : "Este canal no tiene QR disponible todavía."}
           </p>
           <Button variant="secondary" size="small" onClick={() => setQrModalSender(null)}>
             Cerrar
