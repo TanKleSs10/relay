@@ -12,12 +12,22 @@ import { randomDelay } from "../../utils/delay.js";
 import type { Logger } from "../../utils/logger.js";
 import type { SenderRetryController } from "../../utils/sender-retry-controller.js";
 
-const MAX_MESSAGES_PER_TICK = 12;
-const MAX_PER_SENDER_PER_TICK = 1;
-const LOW_QUEUE_THRESHOLD = 50;
-const FAST_DELAY_RANGE = { min: 150, max: 400 };
-const MEDIUM_DELAY_RANGE = { min: 300, max: 700 };
-const SLOW_DELAY_RANGE = { min: 500, max: 1200 };
+const DISPATCH_LIMITS = {
+  maxMessagesPerTick: 12,
+  maxPerSenderPerTick: 1,
+  lowQueueThreshold: 50,
+} as const;
+const TEXT_DELAY_PROFILES = {
+  fast: { min: 150, max: 400 },
+  medium: { min: 300, max: 700 },
+  slow: { min: 500, max: 1200 },
+} as const;
+const WARMUP_DELAY_MULTIPLIERS = [2.2, 1.7, 1.3] as const;
+const SOFT_COOLDOWN = {
+  everyMessages: 5,
+  minMs: 1_500,
+  maxMs: 3_000,
+} as const;
 const MAX_CONSECUTIVE_FAILURES = 3;
 const MAX_INIT_RETRIES = 3;
 const PROCESSING_LOCK_WINDOW_MIN = 5;
@@ -115,27 +125,28 @@ export class CampaignManager {
         this.cachedQueue = await this.messageRepository.claimNextBatch(
           campaignId,
           this.workerId,
-          MAX_MESSAGES_PER_TICK
+          DISPATCH_LIMITS.maxMessagesPerTick
         );
         this.logger.info(
           `reserved ${this.cachedQueue.length} queued messages for campaign ${campaignId}`
         );
       }
 
-      const senderLimit = Math.max(1, senders.length) * MAX_PER_SENDER_PER_TICK;
+      const senderLimit =
+        Math.max(1, senders.length) * DISPATCH_LIMITS.maxPerSenderPerTick;
       const allowedCount = Math.min(this.cachedQueue.length, senderLimit);
       const batch = this.cachedQueue.splice(0, allowedCount);
       this.logger.info(`dispatching ${batch.length} messages for campaign ${campaignId}`);
       this.logger.info(
-        `limits: max_per_tick=${MAX_MESSAGES_PER_TICK}, max_per_sender=${MAX_PER_SENDER_PER_TICK}, senders_ready=${senders.length}, queued_batch=${batch.length}`
+        `limits: max_per_tick=${DISPATCH_LIMITS.maxMessagesPerTick}, max_per_sender=${DISPATCH_LIMITS.maxPerSenderPerTick}, senders_ready=${senders.length}, queued_batch=${batch.length}`
       );
-      const delayRange = pickDelayRange(
+      const baseDelayRange = pickTextDelayRange(
         batch.length,
         senders.length,
-        LOW_QUEUE_THRESHOLD
+        DISPATCH_LIMITS.lowQueueThreshold
       );
       this.logger.info(
-        `delay range: ${delayRange.min}-${delayRange.max}ms`
+        `delay profile: type=text base_range=${baseDelayRange.min}-${baseDelayRange.max}ms`
       );
       const perSenderCount = new Map<string, number>();
       for (const message of batch) {
@@ -143,7 +154,7 @@ export class CampaignManager {
           senders,
           perSenderCount,
           this.senderTotals,
-          MAX_PER_SENDER_PER_TICK,
+          DISPATCH_LIMITS.maxPerSenderPerTick,
           this.roundRobinIndex
         );
         if (!sender) {
@@ -177,9 +188,15 @@ export class CampaignManager {
           );
           continue;
         }
-        await randomDelay(delayRange.min, delayRange.max);
+        const totalSentBeforeSend = this.senderTotals.get(sender.id) ?? 0;
+        const warmupStep = getWarmupStep(totalSentBeforeSend);
+        const delayRange = applyWarmupMultiplier(baseDelayRange, warmupStep);
+        const appliedDelay = await randomDelay(delayRange.min, delayRange.max);
         this.logger.info(
-          `sending message ${message.id} via sender ${sender.id} to ${message.recipient}`
+          `delay sender=${sender.id} type=text warmup_step=${warmupStep} applied=${appliedDelay}ms range=${delayRange.min}-${delayRange.max}ms`
+        );
+        this.logger.info(
+          `sending message ${message.id} via sender ${sender.id} to ${message.recipient} type=text`
         );
         const alreadySent = await this.messageRepository.hasSentIdempotency(
           campaignId,
@@ -209,6 +226,7 @@ export class CampaignManager {
         if (result.sent) {
           this.failureStreaks.set(sender.id, 0);
           this.sentKeys.add(dedupeKey);
+          await this.applySoftCooldownIfNeeded(sender.id);
         } else {
           if (result.avoidCooldown) {
             this.failureStreaks.set(sender.id, 0);
@@ -464,6 +482,21 @@ export class CampaignManager {
 
     return woken;
   }
+
+  private async applySoftCooldownIfNeeded(senderId: string): Promise<void> {
+    const totalSent = this.senderTotals.get(senderId) ?? 0;
+    if (totalSent === 0 || totalSent % SOFT_COOLDOWN.everyMessages !== 0) {
+      return;
+    }
+
+    const cooldownMs = await randomDelay(
+      SOFT_COOLDOWN.minMs,
+      SOFT_COOLDOWN.maxMs
+    );
+    this.logger.info(
+      `sender ${senderId} soft cooldown applied=${cooldownMs}ms after total_sent=${totalSent}`
+    );
+  }
 }
 
 function pickSenderBalanced(
@@ -520,16 +553,31 @@ function isNoWaRecipient(error: string): boolean {
   );
 }
 
-function pickDelayRange(
+function pickTextDelayRange(
   batchSize: number,
   senderCount: number,
   lowQueueThreshold: number
 ): { min: number; max: number } {
-  if (batchSize <= lowQueueThreshold && senderCount >= 3) {
-    return FAST_DELAY_RANGE;
+  if (batchSize <= senderCount) {
+    return TEXT_DELAY_PROFILES.fast;
   }
-  if (senderCount <= 1) {
-    return SLOW_DELAY_RANGE;
+  if (batchSize <= lowQueueThreshold) {
+    return TEXT_DELAY_PROFILES.medium;
   }
-  return MEDIUM_DELAY_RANGE;
+  return TEXT_DELAY_PROFILES.slow;
+}
+
+function getWarmupStep(totalSentBeforeSend: number): number {
+  return Math.min(totalSentBeforeSend, WARMUP_DELAY_MULTIPLIERS.length - 1);
+}
+
+function applyWarmupMultiplier(
+  range: { min: number; max: number },
+  warmupStep: number
+): { min: number; max: number } {
+  const multiplier = WARMUP_DELAY_MULTIPLIERS[warmupStep] ?? 1;
+  return {
+    min: Math.round(range.min * multiplier),
+    max: Math.round(range.max * multiplier),
+  };
 }
