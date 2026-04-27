@@ -148,7 +148,7 @@ export class WhatsAppProvider implements MessageProvider {
           senderId,
           sessionKey,
           reason: message,
-          category: "auth_corrupt",
+          category: "auth_invalid",
         },
       });
       void this.clear(senderId, false);

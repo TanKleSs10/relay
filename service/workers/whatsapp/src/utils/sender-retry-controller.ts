@@ -48,6 +48,24 @@ export class SenderRetryController {
     return retryState;
   }
 
+  recordFailureWithBackoff(
+    senderId: string,
+    sessionKey: string,
+    backoffMs: number,
+    now = Date.now()
+  ): RetryState {
+    const current = this.state.get(senderId);
+    const failures =
+      current?.sessionKey === sessionKey ? (current.failures ?? 0) + 1 : 1;
+    const retryState = {
+      failures,
+      nextRetryAt: now + Math.max(0, backoffMs),
+      sessionKey,
+    };
+    this.state.set(senderId, retryState);
+    return retryState;
+  }
+
   recordSuccess(senderId: string): void {
     this.state.delete(senderId);
   }

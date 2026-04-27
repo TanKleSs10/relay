@@ -9,12 +9,15 @@ import type { SenderRepository } from "../../domain/interfaces/sender.repository
 import { SenderLifecycleManager } from "./sender-lifecycle.manager.js";
 import { CampaignRepository } from "../../infrastructure/repositories/campaign.repository.js";
 import { removeAuthSession } from "../../utils/auth.js";
+import { classifyWorkerError } from "../../utils/error-classifier.js";
 import type { Logger } from "../../utils/logger.js";
 import type { SenderRetryController } from "../../utils/sender-retry-controller.js";
 import type { WorkerEventBus } from "../../utils/worker-events.js";
 
 const INITIALIZING_TIMEOUT_MS = 90_000;
 const ERROR_RECOVERY_DELAY_MS = 30_000;
+const PROFILE_LOCK_BACKOFF_MS = 5 * 60_000;
+const TRANSIENT_RECOVERY_BACKOFF_MS = 60_000;
 const IDLE_TIMEOUT_MS = 10 * 60_000;
 const POST_SEND_KEEPALIVE_MS = 5 * 60_000;
 const QR_ACTIVE_TIMEOUT_MS = 3 * 60_000;
@@ -196,20 +199,67 @@ export class SessionManager {
         try {
           await this.provider.initialize(sender.id, sender.sessionKey);
         } catch (error) {
-          const retryState = this.retryController.recordFailure(
-            sender.id,
-            sender.sessionKey
-          );
-          this.logger.error(`failed to reinitialize sender ${sender.id}`, error);
-          this.logger.warn(
-            `sender ${sender.id} scheduled for retry in ${Math.ceil(
-              (retryState.nextRetryAt - Date.now()) / 1000
-            )}s after ${retryState.failures} init failures`
-          );
-          await this.senderRepository.updateStatus(sender.id, SenderAccountStatus.ERROR);
+          await this.handleReinitializeFailure(sender, error);
         }
       }
     }
+  }
+
+  private async handleReinitializeFailure(
+    sender: SenderEntity,
+    error: unknown
+  ): Promise<void> {
+    const category = classifyWorkerError(error);
+    this.logger.error(`failed to reinitialize sender ${sender.id}`, error);
+
+    if (category === "auth_invalid") {
+      this.logger.warn(
+        `sender ${sender.id} recovery category=${category} next=QR_INACTIVE`
+      );
+      await this.provider.clear?.(sender.id, false);
+      await this.senderRepository.markQrInactive(sender.id);
+      await cleanupAuthState(sender.sessionKey, this.logger);
+      this.retryController.recordSuccess(sender.id);
+      return;
+    }
+
+    if (
+      category === "profile_lock" ||
+      category === "target_closed" ||
+      category === "execution_context_destroyed"
+    ) {
+      const backoffMs =
+        category === "profile_lock"
+          ? PROFILE_LOCK_BACKOFF_MS
+          : TRANSIENT_RECOVERY_BACKOFF_MS;
+      const retryState = this.retryController.recordFailureWithBackoff(
+        sender.id,
+        sender.sessionKey,
+        backoffMs
+      );
+      this.logger.warn(
+        `sender ${sender.id} recovery category=${category} next=DISCONNECTED retry_in=${Math.ceil(
+          (retryState.nextRetryAt - Date.now()) / 1000
+        )}s`
+      );
+      await this.provider.clear?.(sender.id, false);
+      await this.senderRepository.updateStatus(
+        sender.id,
+        SenderAccountStatus.DISCONNECTED
+      );
+      return;
+    }
+
+    const retryState = this.retryController.recordFailure(
+      sender.id,
+      sender.sessionKey
+    );
+    this.logger.warn(
+      `sender ${sender.id} recovery category=${category} next=ERROR retry_in=${Math.ceil(
+        (retryState.nextRetryAt - Date.now()) / 1000
+      )}s after ${retryState.failures} init failures`
+    );
+    await this.senderRepository.updateStatus(sender.id, SenderAccountStatus.ERROR);
   }
 
   private async handleUnknownState(
