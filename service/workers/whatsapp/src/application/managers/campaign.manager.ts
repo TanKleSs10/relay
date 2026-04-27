@@ -1,8 +1,12 @@
-import type { MessageProvider } from "../../domain/interfaces/message-provider.interface.js";
+import type {
+  MessageProvider,
+  OutboundMedia,
+} from "../../domain/interfaces/message-provider.interface.js";
 import { SenderAccountStatus } from "../../domain/enums/index.js";
 import type { SenderRepository } from "../../domain/interfaces/sender.repository.interface.js";
 import { SenderLifecycleManager } from "./sender-lifecycle.manager.js";
 import { CampaignRepository } from "../../infrastructure/repositories/campaign.repository.js";
+import { CampaignMediaRepository } from "../../infrastructure/repositories/campaign-media.repository.js";
 import {
   MessageRepository,
   type MessageRow,
@@ -44,6 +48,7 @@ export class CampaignManager {
   private lastNoActiveLogAt = 0;
   private lastLiveLimitLogAt = 0;
   private senderTotals = new Map<string, number>();
+  private cachedMedia: OutboundMedia[] | null = null;
 
   constructor(
     private provider: MessageProvider,
@@ -51,6 +56,7 @@ export class CampaignManager {
     private lifecycleManager: SenderLifecycleManager,
     private messageRepository: MessageRepository,
     private campaignRepository: CampaignRepository,
+    private campaignMediaRepository: CampaignMediaRepository,
     private logger: Logger,
     private workerId: string,
     private sendLogRepository: SendLogRepository,
@@ -81,6 +87,7 @@ export class CampaignManager {
       if (this.cachedCampaignId !== campaignId) {
         this.cachedCampaignId = campaignId;
         this.cachedQueue = [];
+        this.cachedMedia = null;
         this.roundRobinIndex = 0;
         this.sentKeys.clear();
         this.senderTotals.clear();
@@ -134,6 +141,18 @@ export class CampaignManager {
 
       const senderLimit =
         Math.max(1, senders.length) * DISPATCH_LIMITS.maxPerSenderPerTick;
+      if (this.cachedMedia === null) {
+        this.cachedMedia = await this.campaignMediaRepository.listByCampaign(
+          campaignId
+        );
+        if (this.cachedMedia.length > 0) {
+          this.logger.info(
+            `campaign ${campaignId} loaded ${this.cachedMedia.length} media assets`
+          );
+        }
+      }
+
+      const senderLimit = Math.max(1, senders.length) * MAX_PER_SENDER_PER_TICK;
       const allowedCount = Math.min(this.cachedQueue.length, senderLimit);
       const batch = this.cachedQueue.splice(0, allowedCount);
       this.logger.info(`dispatching ${batch.length} messages for campaign ${campaignId}`);
@@ -222,7 +241,11 @@ export class CampaignManager {
           );
           continue;
         }
-        const result = await this.sendWithSender(sender.id, message);
+        const result = await this.sendWithSender(
+          sender.id,
+          message,
+          this.cachedMedia
+        );
         if (result.sent) {
           this.failureStreaks.set(sender.id, 0);
           this.sentKeys.add(dedupeKey);
@@ -263,7 +286,8 @@ export class CampaignManager {
 
   private async sendWithSender(
     senderId: string,
-    message: MessageRow
+    message: MessageRow,
+    media: OutboundMedia[]
   ): Promise<{ sent: boolean; avoidCooldown: boolean }> {
     try {
       await this.senderRepository.updateStatus(
@@ -288,7 +312,17 @@ export class CampaignManager {
         );
         return { sent: true, avoidCooldown: false };
       }
-      await this.provider.sendMessage(senderId, message.recipient, message.content);
+      if (media.length > 0) {
+        this.logger.info(
+          `sending message ${message.id} with ${media.length} media assets via sender ${senderId}`
+        );
+      }
+      await this.provider.sendMessage(
+        senderId,
+        message.recipient,
+        message.content,
+        media
+      );
       await this.messageRepository.markSent(message.id, senderId);
       await this.sendLogRepository.create({
         messageId: message.id,

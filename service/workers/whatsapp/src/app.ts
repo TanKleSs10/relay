@@ -12,6 +12,7 @@ import { WorkerManager } from "./application/managers/worker.manager.js";
 import { connectDB } from "./infrastructure/db/connection.js";
 import { createMessageProvider } from "./infrastructure/providers/provider.factory.js";
 import { CampaignRepository } from "./infrastructure/repositories/campaign.repository.js";
+import { CampaignMediaRepository } from "./infrastructure/repositories/campaign-media.repository.js";
 import { MessageRepository } from "./infrastructure/repositories/message.repository.js";
 import { SenderRepository } from "./infrastructure/repositories/sender.repository.js";
 import { SendLogRepository } from "./infrastructure/repositories/send-log.repository.js";
@@ -43,6 +44,7 @@ async function bootstrap() {
   const senderRepository = new SenderRepository(pool);
   const messageRepository = new MessageRepository(pool);
   const campaignRepository = new CampaignRepository(pool);
+  const campaignMediaRepository = new CampaignMediaRepository(pool);
   const sendLogRepository = new SendLogRepository(pool);
 
   const workerManager = new WorkerManager(workerRepository, createLogger("WorkerManager"));
@@ -76,6 +78,7 @@ async function bootstrap() {
     senderLifecycleManager,
     messageRepository,
     campaignRepository,
+    campaignMediaRepository,
     createLogger("CampaignManager"),
     worker.id,
     sendLogRepository,

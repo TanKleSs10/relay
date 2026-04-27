@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     jwt_cookie_name: str = "relay_access"
     jwt_cookie_secure: bool = False
     whatsapp_auth_path: str = "/app/.wwebjs_auth"
+    cloudinary_cloud_name: str = ""
+    cloudinary_api_key: str = ""
+    cloudinary_api_secret: str = ""
+    cloudinary_folder: str = "relay_engine"
+    media_max_images_per_campaign: int = 5
+    media_max_image_bytes: int = 10 * 1024 * 1024
+    media_allowed_image_formats: str = "jpg,jpeg,png,webp"
 
     model_config = SettingsConfigDict(
         env_file=".env",
