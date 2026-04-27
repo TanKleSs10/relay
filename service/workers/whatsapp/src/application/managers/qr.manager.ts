@@ -21,7 +21,7 @@ export class QrManager {
     if (this.initLocked) {
       return;
     }
-    const senders = await this.senderRepository.listQrRequiredWithoutCode();
+    const senders = await this.senderRepository.listQrRequested();
     let sender = null;
     for (const candidate of senders) {
       const liveSessionKey = this.provider.getSessionKey?.(candidate.id) ?? null;
@@ -50,7 +50,7 @@ export class QrManager {
     this.logger.info(`qr init for sender ${sender.id}`);
     this.lifecycleManager.ensureRegistered(sender.id);
     if (sender.status !== SenderAccountStatus.INITIALIZING) {
-      this.logger.info(`sender ${sender.id} -> INITIALIZING`);
+      this.logger.info(`sender ${sender.id} -> INITIALIZING (qr requested)`);
       await this.senderRepository.updateStatus(
         sender.id,
         SenderAccountStatus.INITIALIZING

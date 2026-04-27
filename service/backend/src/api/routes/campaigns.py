@@ -10,6 +10,11 @@ from src.application.usecases.campaign_usecases import (
     retry_campaign,
     update_campaign,
 )
+from src.application.usecases.media_asset_usecases import (
+    list_campaign_media,
+    remove_campaign_media,
+    upload_campaign_media,
+)
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
@@ -21,6 +26,7 @@ from src.api.schemas.campaigns import (
     CampaignUploadSummary,
     CampaignMetrics,
 )
+from src.api.schemas.media_assets import CampaignMediaAssetRead
 from sqlalchemy.orm import Session
 from src.api.routes.deps import get_db
 from src.security.auth import require_permission
@@ -151,3 +157,37 @@ def retry_item(
     _: object = Depends(require_permission(PERM_CAMPAIGN_MANAGE)),
 ):
     return retry_campaign(campaign_id, db)
+
+
+@router.get("/{campaign_id}/media", response_model=list[CampaignMediaAssetRead])
+def list_media_items(
+    campaign_id: UUID,
+    db: Session = Depends(get_db),
+    _: object = Depends(require_permission(PERM_CAMPAIGN_READ)),
+):
+    return list_campaign_media(campaign_id, db)
+
+
+@router.post(
+    "/{campaign_id}/media",
+    response_model=CampaignMediaAssetRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def upload_media_item(
+    campaign_id: UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _: object = Depends(require_permission(PERM_CAMPAIGN_MANAGE)),
+):
+    return upload_campaign_media(campaign_id, file, db)
+
+
+@router.delete("/{campaign_id}/media/{media_asset_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_media_item(
+    campaign_id: UUID,
+    media_asset_id: UUID,
+    db: Session = Depends(get_db),
+    _: object = Depends(require_permission(PERM_CAMPAIGN_MANAGE)),
+):
+    remove_campaign_media(campaign_id, media_asset_id, db)
+    return None

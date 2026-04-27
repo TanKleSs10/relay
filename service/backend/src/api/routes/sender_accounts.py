@@ -18,6 +18,7 @@ from src.application.usecases.sender_account_usecases import (
     get_sender as get_sender_usecase,
     list_senders as list_senders_usecase,
     remove_sender as remove_sender_usecase,
+    request_sender_qr_code as request_sender_qr_code_usecase,
     reset_sender as reset_sender_usecase,
     update_sender as update_sender_usecase,
 )
@@ -92,6 +93,15 @@ def reset_session(
     _: object = Depends(require_permission(PERM_SENDER_MANAGE)),
 ):
     return reset_sender_usecase(sender_id, db)
+
+
+@router.post("/{sender_id}/request-qr", response_model=SenderAccountRead)
+def request_qr(
+    sender_id: UUID,
+    db: Session = Depends(get_db),
+    _: object = Depends(require_permission(PERM_SENDER_MANAGE)),
+):
+    return request_sender_qr_code_usecase(sender_id, db)
 
 
 @router.get("/{sender_id}/session", response_model=SenderSessionRead | None)

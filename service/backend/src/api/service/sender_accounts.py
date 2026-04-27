@@ -76,7 +76,7 @@ def update_sender_account(
 
 def reset_sender_session(db: Session, sender: SenderAccount) -> SenderAccount:
     previous_session_key = sender.session.session_key if sender.session else None
-    sender.status = SenderAccountStatus.WAITING_QR
+    sender.status = SenderAccountStatus.QR_REQUESTED
     sender.phone_number = None
     new_session_key = f"sender-{sender.id}-{uuid4().hex[:8]}"
     session = sender.session
@@ -113,6 +113,47 @@ def reset_sender_session(db: Session, sender: SenderAccount) -> SenderAccount:
         session.last_heartbeat_at = None
     if previous_session_key:
         delete_sender_auth_dir(previous_session_key)
+    return sender
+
+
+def request_sender_qr(db: Session, sender: SenderAccount) -> SenderAccount:
+    if sender.status in {
+        SenderAccountStatus.CONNECTED,
+        SenderAccountStatus.IDLE,
+        SenderAccountStatus.SENDING,
+        SenderAccountStatus.AUTHENTICATING,
+        SenderAccountStatus.CONNECTING,
+    }:
+        raise ConflictError("Sender does not require QR")
+
+    if sender.status == SenderAccountStatus.WAITING_QR and sender.session and sender.session.qr_code:
+        return sender
+
+    sender.status = SenderAccountStatus.QR_REQUESTED
+    sender.phone_number = None
+    session = sender.session
+    if session is None:
+        session = SenderSession(
+            sender=sender,
+            sender_account_id=sender.id,
+            session_key=f"sender-{sender.id}",
+            qr_code=None,
+            qr_generated_at=None,
+            last_ready_at=None,
+            last_disconnect_at=None,
+            disconnect_reason=None,
+            restart_count=0,
+            health_status=SenderSessionHealth.HEALTHY,
+            last_heartbeat_at=None,
+            auth_dir=None,
+            browser_pid=None,
+            websocket_state=None,
+        )
+        db.add(session)
+        return sender
+
+    session.qr_code = None
+    session.qr_generated_at = None
     return sender
 
 

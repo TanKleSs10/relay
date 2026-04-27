@@ -29,6 +29,12 @@ export function resetSenderSession(senderId: string) {
   return request(`/sender-accounts/${senderId}/reset-session`, { method: "POST" });
 }
 
+export function requestSenderQr(senderId: string) {
+  return request<SenderAccount>(`/sender-accounts/${senderId}/request-qr`, {
+    method: "POST",
+  });
+}
+
 export function getSenderQr(senderId: string) {
   return request<SenderQr>(`/sender-accounts/${senderId}/qr`);
 }

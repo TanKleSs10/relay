@@ -1,8 +1,12 @@
-import type { MessageProvider } from "../../domain/interfaces/message-provider.interface.js";
+import type {
+  MessageProvider,
+  OutboundMedia,
+} from "../../domain/interfaces/message-provider.interface.js";
 import { SenderAccountStatus } from "../../domain/enums/index.js";
 import type { SenderRepository } from "../../domain/interfaces/sender.repository.interface.js";
 import { SenderLifecycleManager } from "./sender-lifecycle.manager.js";
 import { CampaignRepository } from "../../infrastructure/repositories/campaign.repository.js";
+import { CampaignMediaRepository } from "../../infrastructure/repositories/campaign-media.repository.js";
 import {
   MessageRepository,
   type MessageRow,
@@ -12,16 +16,28 @@ import { randomDelay } from "../../utils/delay.js";
 import type { Logger } from "../../utils/logger.js";
 import type { SenderRetryController } from "../../utils/sender-retry-controller.js";
 
-const MAX_MESSAGES_PER_TICK = 12;
-const MAX_PER_SENDER_PER_TICK = 1;
-const LOW_QUEUE_THRESHOLD = 50;
-const FAST_DELAY_RANGE = { min: 150, max: 400 };
-const MEDIUM_DELAY_RANGE = { min: 300, max: 700 };
-const SLOW_DELAY_RANGE = { min: 500, max: 1200 };
+const DISPATCH_LIMITS = {
+  maxMessagesPerTick: 12,
+  maxPerSenderPerTick: 1,
+  lowQueueThreshold: 50,
+} as const;
+const TEXT_DELAY_PROFILES = {
+  fast: { min: 150, max: 400 },
+  medium: { min: 300, max: 700 },
+  slow: { min: 500, max: 1200 },
+} as const;
+const WARMUP_DELAY_MULTIPLIERS = [2.2, 1.7, 1.3] as const;
+const SOFT_COOLDOWN = {
+  everyMessages: 5,
+  minMs: 1_500,
+  maxMs: 3_000,
+} as const;
 const MAX_CONSECUTIVE_FAILURES = 3;
 const MAX_INIT_RETRIES = 3;
 const PROCESSING_LOCK_WINDOW_MIN = 5;
 const MAX_IDLE_WAKEUPS_PER_TICK = 1;
+const MAX_LIVE_SESSIONS = 1;
+const LIVE_SESSION_LIMIT_LOG_INTERVAL_MS = 15_000;
 
 export class CampaignManager {
   private failureStreaks = new Map<string, number>();
@@ -30,7 +46,9 @@ export class CampaignManager {
   private roundRobinIndex = 0;
   private sentKeys = new Set<string>();
   private lastNoActiveLogAt = 0;
+  private lastLiveLimitLogAt = 0;
   private senderTotals = new Map<string, number>();
+  private cachedMedia: OutboundMedia[] | null = null;
 
   constructor(
     private provider: MessageProvider,
@@ -38,6 +56,7 @@ export class CampaignManager {
     private lifecycleManager: SenderLifecycleManager,
     private messageRepository: MessageRepository,
     private campaignRepository: CampaignRepository,
+    private campaignMediaRepository: CampaignMediaRepository,
     private logger: Logger,
     private workerId: string,
     private sendLogRepository: SendLogRepository,
@@ -68,6 +87,7 @@ export class CampaignManager {
       if (this.cachedCampaignId !== campaignId) {
         this.cachedCampaignId = campaignId;
         this.cachedQueue = [];
+        this.cachedMedia = null;
         this.roundRobinIndex = 0;
         this.sentKeys.clear();
         this.senderTotals.clear();
@@ -112,11 +132,24 @@ export class CampaignManager {
         this.cachedQueue = await this.messageRepository.claimNextBatch(
           campaignId,
           this.workerId,
-          MAX_MESSAGES_PER_TICK
+          DISPATCH_LIMITS.maxMessagesPerTick
         );
         this.logger.info(
           `reserved ${this.cachedQueue.length} queued messages for campaign ${campaignId}`
         );
+      }
+
+      const senderLimit =
+        Math.max(1, senders.length) * DISPATCH_LIMITS.maxPerSenderPerTick;
+      if (this.cachedMedia === null) {
+        this.cachedMedia = await this.campaignMediaRepository.listByCampaign(
+          campaignId
+        );
+        if (this.cachedMedia.length > 0) {
+          this.logger.info(
+            `campaign ${campaignId} loaded ${this.cachedMedia.length} media assets`
+          );
+        }
       }
 
       const senderLimit = Math.max(1, senders.length) * MAX_PER_SENDER_PER_TICK;
@@ -124,15 +157,15 @@ export class CampaignManager {
       const batch = this.cachedQueue.splice(0, allowedCount);
       this.logger.info(`dispatching ${batch.length} messages for campaign ${campaignId}`);
       this.logger.info(
-        `limits: max_per_tick=${MAX_MESSAGES_PER_TICK}, max_per_sender=${MAX_PER_SENDER_PER_TICK}, senders_ready=${senders.length}, queued_batch=${batch.length}`
+        `limits: max_per_tick=${DISPATCH_LIMITS.maxMessagesPerTick}, max_per_sender=${DISPATCH_LIMITS.maxPerSenderPerTick}, senders_ready=${senders.length}, queued_batch=${batch.length}`
       );
-      const delayRange = pickDelayRange(
+      const baseDelayRange = pickTextDelayRange(
         batch.length,
         senders.length,
-        LOW_QUEUE_THRESHOLD
+        DISPATCH_LIMITS.lowQueueThreshold
       );
       this.logger.info(
-        `delay range: ${delayRange.min}-${delayRange.max}ms`
+        `delay profile: type=text base_range=${baseDelayRange.min}-${baseDelayRange.max}ms`
       );
       const perSenderCount = new Map<string, number>();
       for (const message of batch) {
@@ -140,7 +173,7 @@ export class CampaignManager {
           senders,
           perSenderCount,
           this.senderTotals,
-          MAX_PER_SENDER_PER_TICK,
+          DISPATCH_LIMITS.maxPerSenderPerTick,
           this.roundRobinIndex
         );
         if (!sender) {
@@ -174,9 +207,15 @@ export class CampaignManager {
           );
           continue;
         }
-        await randomDelay(delayRange.min, delayRange.max);
+        const totalSentBeforeSend = this.senderTotals.get(sender.id) ?? 0;
+        const warmupStep = getWarmupStep(totalSentBeforeSend);
+        const delayRange = applyWarmupMultiplier(baseDelayRange, warmupStep);
+        const appliedDelay = await randomDelay(delayRange.min, delayRange.max);
         this.logger.info(
-          `sending message ${message.id} via sender ${sender.id} to ${message.recipient}`
+          `delay sender=${sender.id} type=text warmup_step=${warmupStep} applied=${appliedDelay}ms range=${delayRange.min}-${delayRange.max}ms`
+        );
+        this.logger.info(
+          `sending message ${message.id} via sender ${sender.id} to ${message.recipient} type=text`
         );
         const alreadySent = await this.messageRepository.hasSentIdempotency(
           campaignId,
@@ -202,10 +241,15 @@ export class CampaignManager {
           );
           continue;
         }
-        const result = await this.sendWithSender(sender.id, message);
+        const result = await this.sendWithSender(
+          sender.id,
+          message,
+          this.cachedMedia
+        );
         if (result.sent) {
           this.failureStreaks.set(sender.id, 0);
           this.sentKeys.add(dedupeKey);
+          await this.applySoftCooldownIfNeeded(sender.id);
         } else {
           if (result.avoidCooldown) {
             this.failureStreaks.set(sender.id, 0);
@@ -242,7 +286,8 @@ export class CampaignManager {
 
   private async sendWithSender(
     senderId: string,
-    message: MessageRow
+    message: MessageRow,
+    media: OutboundMedia[]
   ): Promise<{ sent: boolean; avoidCooldown: boolean }> {
     try {
       await this.senderRepository.updateStatus(
@@ -267,7 +312,17 @@ export class CampaignManager {
         );
         return { sent: true, avoidCooldown: false };
       }
-      await this.provider.sendMessage(senderId, message.recipient, message.content);
+      if (media.length > 0) {
+        this.logger.info(
+          `sending message ${message.id} with ${media.length} media assets via sender ${senderId}`
+        );
+      }
+      await this.provider.sendMessage(
+        senderId,
+        message.recipient,
+        message.content,
+        media
+      );
       await this.messageRepository.markSent(message.id, senderId);
       await this.sendLogRepository.create({
         messageId: message.id,
@@ -401,6 +456,26 @@ export class CampaignManager {
   }
 
   private async wakeIdleSenders(campaignId: string): Promise<number> {
+    const liveSessionCount = this.provider.listSenderIds?.().length ?? 0;
+    if (liveSessionCount >= MAX_LIVE_SESSIONS) {
+      const now = Date.now();
+      if (now - this.lastLiveLimitLogAt >= LIVE_SESSION_LIMIT_LOG_INTERVAL_MS) {
+        this.logger.info(
+          `campaign ${campaignId} wakeup skip: live session limit reached (${liveSessionCount}/${MAX_LIVE_SESSIONS})`
+        );
+        this.lastLiveLimitLogAt = now;
+      }
+      return 0;
+    }
+
+    const availableSlots = Math.min(
+      MAX_IDLE_WAKEUPS_PER_TICK,
+      MAX_LIVE_SESSIONS - liveSessionCount
+    );
+    if (availableSlots <= 0) {
+      return 0;
+    }
+
     const idleSenders = await this.senderRepository.listByStatus(
       SenderAccountStatus.IDLE
     );
@@ -409,12 +484,14 @@ export class CampaignManager {
     }
 
     let woken = 0;
-    for (const sender of idleSenders.slice(0, MAX_IDLE_WAKEUPS_PER_TICK)) {
+    for (const sender of idleSenders.slice(0, availableSlots)) {
       if (!this.retryController.canAttempt(sender.id, sender.sessionKey)) {
         continue;
       }
 
-      this.logger.info(`waking IDLE sender ${sender.id} for campaign ${campaignId}`);
+      this.logger.info(
+        `waking IDLE sender ${sender.id} for campaign ${campaignId} (${liveSessionCount + woken + 1}/${MAX_LIVE_SESSIONS})`
+      );
       this.lifecycleManager.ensureRegistered(sender.id);
       await this.senderRepository.updateStatus(
         sender.id,
@@ -438,6 +515,21 @@ export class CampaignManager {
     }
 
     return woken;
+  }
+
+  private async applySoftCooldownIfNeeded(senderId: string): Promise<void> {
+    const totalSent = this.senderTotals.get(senderId) ?? 0;
+    if (totalSent === 0 || totalSent % SOFT_COOLDOWN.everyMessages !== 0) {
+      return;
+    }
+
+    const cooldownMs = await randomDelay(
+      SOFT_COOLDOWN.minMs,
+      SOFT_COOLDOWN.maxMs
+    );
+    this.logger.info(
+      `sender ${senderId} soft cooldown applied=${cooldownMs}ms after total_sent=${totalSent}`
+    );
   }
 }
 
@@ -495,16 +587,31 @@ function isNoWaRecipient(error: string): boolean {
   );
 }
 
-function pickDelayRange(
+function pickTextDelayRange(
   batchSize: number,
   senderCount: number,
   lowQueueThreshold: number
 ): { min: number; max: number } {
-  if (batchSize <= lowQueueThreshold && senderCount >= 3) {
-    return FAST_DELAY_RANGE;
+  if (batchSize <= senderCount) {
+    return TEXT_DELAY_PROFILES.fast;
   }
-  if (senderCount <= 1) {
-    return SLOW_DELAY_RANGE;
+  if (batchSize <= lowQueueThreshold) {
+    return TEXT_DELAY_PROFILES.medium;
   }
-  return MEDIUM_DELAY_RANGE;
+  return TEXT_DELAY_PROFILES.slow;
+}
+
+function getWarmupStep(totalSentBeforeSend: number): number {
+  return Math.min(totalSentBeforeSend, WARMUP_DELAY_MULTIPLIERS.length - 1);
+}
+
+function applyWarmupMultiplier(
+  range: { min: number; max: number },
+  warmupStep: number
+): { min: number; max: number } {
+  const multiplier = WARMUP_DELAY_MULTIPLIERS[warmupStep] ?? 1;
+  return {
+    min: Math.round(range.min * multiplier),
+    max: Math.round(range.max * multiplier),
+  };
 }

@@ -1,6 +1,8 @@
 from src.domain.models import (
     Campaign,
+    CampaignMediaAsset,
     CampaignStatus,
+    MediaAsset,
     Message,
     MessageStatus,
     Permission,
@@ -24,7 +26,9 @@ from src.domain.models import (
 
 __all__ = [
     "Campaign",
+    "CampaignMediaAsset",
     "CampaignStatus",
+    "MediaAsset",
     "Message",
     "MessageStatus",
     "Permission",

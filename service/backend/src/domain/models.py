@@ -10,6 +10,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
     text,
 )
@@ -43,7 +44,9 @@ class SenderAccountStatus(str, Enum):
     CREATED = "CREATED"
     IDLE = "IDLE"
     INITIALIZING = "INITIALIZING"
+    QR_REQUESTED = "QR_REQUESTED"
     WAITING_QR = "WAITING_QR"
+    QR_INACTIVE = "QR_INACTIVE"
     AUTHENTICATING = "AUTHENTICATING"
     CONNECTING = "CONNECTING"
     CONNECTED = "CONNECTED"
@@ -219,6 +222,9 @@ class Campaign(Base):
     messages: Mapped[list[Message]] = relationship(
         "Message", back_populates="campaign", cascade="all, delete-orphan"
     )
+    media_links: Mapped[list["CampaignMediaAsset"]] = relationship(
+        "CampaignMediaAsset", back_populates="campaign", cascade="all, delete-orphan"
+    )
     send_logs: Mapped[list["SendLog"]] = relationship(
         "SendLog", back_populates="campaign", cascade="all, delete-orphan"
     )
@@ -226,6 +232,13 @@ class Campaign(Base):
 
 class Message(Base):
     __tablename__ = "messages"
+    __table_args__ = (
+        UniqueConstraint(
+            "campaign_id",
+            "idempotency_key",
+            name="uq_messages_campaign_idempotency_key",
+        ),
+    )
 
     id: Mapped[PyUUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
@@ -236,9 +249,7 @@ class Message(Base):
     recipient: Mapped[str] = mapped_column(String(50), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     external_id: Mapped[str | None] = mapped_column(String(120))
-    idempotency_key: Mapped[str] = mapped_column(
-        String(64), nullable=False, unique=True
-    )
+    idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     status: Mapped[MessageStatus] = mapped_column(
         SAEnum(MessageStatus, name="message_status"),
         nullable=False,
@@ -412,6 +423,67 @@ class SendRule(Base):
         nullable=False,
         server_default=func.now(),
         onupdate=func.now(),
+    )
+
+
+class MediaAsset(Base):
+    __tablename__ = "media_assets"
+
+    id: Mapped[PyUUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    provider: Mapped[str] = mapped_column(String(50), nullable=False)
+    resource_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    public_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    secure_url: Mapped[str] = mapped_column(Text, nullable=False)
+    bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    format: Mapped[str] = mapped_column(String(20), nullable=False)
+    width: Mapped[int | None] = mapped_column(Integer)
+    height: Mapped[int | None] = mapped_column(Integer)
+    original_filename: Mapped[str | None] = mapped_column(String(255))
+    created_by_user_id: Mapped[PyUUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id")
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    campaign_links: Mapped[list["CampaignMediaAsset"]] = relationship(
+        "CampaignMediaAsset", back_populates="media_asset", cascade="all, delete-orphan"
+    )
+
+
+class CampaignMediaAsset(Base):
+    __tablename__ = "campaign_media_assets"
+
+    id: Mapped[PyUUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    campaign_id: Mapped[PyUUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("campaigns.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    media_asset_id: Mapped[PyUUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("media_assets.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    campaign: Mapped[Campaign] = relationship("Campaign", back_populates="media_links")
+    media_asset: Mapped[MediaAsset] = relationship(
+        "MediaAsset", back_populates="campaign_links"
     )
 
 
