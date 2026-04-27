@@ -152,7 +152,6 @@ export class CampaignManager {
         }
       }
 
-      const senderLimit = Math.max(1, senders.length) * MAX_PER_SENDER_PER_TICK;
       const allowedCount = Math.min(this.cachedQueue.length, senderLimit);
       const batch = this.cachedQueue.splice(0, allowedCount);
       this.logger.info(`dispatching ${batch.length} messages for campaign ${campaignId}`);
