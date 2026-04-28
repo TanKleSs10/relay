@@ -1,44 +1,50 @@
-# Índice de incidentes
+# Incident Index
 
-## Objetivo
+This directory keeps a lightweight catalog of recurring incidents and operational pitfalls found during development and validation.
 
-Consolidar los incidentes recurrentes para no volver a analizarlos desde cero.
+The goal is simple:
 
-## Categorías
+- avoid rediscovering the same failure twice
+- preserve root-cause context
+- keep recovery and follow-up actions easy to find
+
+## Categories
 
 - `wa-engine`
-- `sesiones`
+- `sessions`
 - `deploy`
-- `migraciones`
+- `migrations`
 - `api`
 - `frontend`
-- `infraestructura`
+- `infrastructure`
 
-## Incidentes ya identificados
+## Known incidents
 
-1. `Execution context was destroyed` en `whatsapp-web.js`
-2. `Target closed` / caída del worker por Chromium
-3. `state unknown; skipping transition`
-4. conflicto entre Nginx del host y Nginx en Docker
-5. deploy fallido por cambios locales en VPS
-6. pérdida de estado por `docker compose down -v`
-7. migración fallida por `revision` demasiado larga en Alembic
-8. delete de sender sin cascada de sesión
-9. reset de sesión que no limpiaba auth local
-10. frontend prod dependiendo de build manual
+1. `Execution context was destroyed` in `whatsapp-web.js`
+2. `Target closed` and Chromium-driven worker failures
+3. ambiguous `state unknown` session behavior
+4. host Nginx vs Docker Nginx conflicts
+5. deploy failures caused by local changes on the VPS
+6. state loss caused by `docker compose down -v`
+7. Alembic migration failure due to overly long `revision` values
+8. sender deletion failing because of related records
+9. session reset that did not fully clear local auth
+10. production frontend depending on manual static builds
 
-## Formato recomendado por incidente
+## Recommended incident template
 
-- fecha
-- síntoma
-- impacto
-- causa raíz
-- mitigación temporal
-- solución definitiva
+For each incident, capture:
+
+- date
+- symptom
+- impact
+- root cause
+- temporary mitigation
+- permanent fix
 - follow-up
 
-## Referencias
+## Related documents
 
 - [Worker issues](../worker_issues.md)
-- [Runbook de recuperación de sesión](../runbook/recover-session.md)
-- [Runbook de migraciones](../runbook/migrations.md)
+- [Session recovery runbook](../runbook/recover-session.md)
+- [Migration runbook](../runbook/migrations.md)
