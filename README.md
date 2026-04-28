@@ -106,7 +106,9 @@ See [.env-template](.env-template) for the current baseline.
 docker compose up -d
 ```
 
-Run the local stack with tighter CPU and memory limits to approximate the 4 GB VPS profile:
+Use `docker-compose.dev.yml` for normal local development.
+
+Use the low-memory override when you want local runs to more closely match a constrained deployment target by applying explicit CPU and memory limits per service. Adjust those limits to reflect the environment you want to simulate.
 
 ```bash
 docker compose -f docker-compose.dev.yml -f docker-compose.dev-lowmem.yml up -d --build
