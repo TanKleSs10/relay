@@ -1,69 +1,170 @@
-# Relay
+# Relay Engine
 
-Relay is a product‑first WhatsApp campaign dispatcher for teams that need to send
-high‑volume messages without losing control of deliverability. It separates
-**orchestration (API)**, **execution (worker)**, and **channel (provider)** so you
-can scale or swap providers later without rewriting business logic.
+Relay Engine is a WhatsApp campaign orchestration platform designed for teams that need controlled outbound messaging, sender rotation, QR-based onboarding, and operational visibility.
 
-## Product goal
+It separates the product into three clear layers:
 
-Provide a reliable workflow to:
-- register WhatsApp senders via QR,
-- upload campaigns from CSV,
-- dispatch messages safely with basic anti‑ban rules,
-- track status end‑to‑end.
+- `frontend`: campaign and channel management UI
+- `backend`: business rules, authentication, campaign ingestion, and media APIs
+- `wa-engine`: session lifecycle management and message dispatch through `whatsapp-web.js`
 
-## MVP scope
-- Sender onboarding via QR (WhatsApp Web).
-- Campaign creation and CSV ingestion.
-- Background dispatch with rotation and throttling.
-- Campaign status tracking and retry.
-- Admin/user authentication with basic roles.
+## What it does
 
-Out of scope: multi‑tenant workspaces, billing, public API, SMS/email.
+- onboard WhatsApp senders through QR
+- upload recipient/message batches from CSV
+- dispatch campaigns through a background worker
+- rotate senders and keep sessions under control
+- attach optional images to campaigns
+- track campaign and sender state end-to-end
 
-## User flow
-1) Admin creates users (ADMIN or USER).
-2) Create a campaign.
-3) Upload a CSV of recipients and messages.
-4) Register sender numbers (QR).
-5) Dispatch the campaign.
-6) Track status and retry failures if needed.
+## Why this project is interesting
 
-## Architecture overview
+This project is not just a CRUD app around WhatsApp. It deals with:
+
+- session lifecycle and recovery
+- passive vs active runtime cost on small VPS instances
+- campaign dispatch orchestration
+- anti-ban send rhythm calibration
+- media delivery through Cloudinary + WhatsApp
+- operational concerns such as migrations, deploys, retries, and observability
+
+## Architecture
+
+```text
+React / Vite frontend
+        |
+        v
+FastAPI backend
+        |
+        v
+PostgreSQL
+        ^
+        |
+Node.js WhatsApp worker
+        |
+        v
+whatsapp-web.js / Puppeteer
 ```
-Web UI
-  ↓
-API (FastAPI)
-  ↓
-PostgreSQL (source of truth)
-  ↑
-Worker (Node/WhatsApp Web)
-  ↓
-Provider (whatsapp-web.js)
+
+## Core capabilities
+
+### Sender lifecycle
+- QR requested, active, and passive QR states
+- idle vs connected sender states
+- bounded live sessions for small infrastructure
+- recovery flows for disconnects and auth failures
+
+### Campaigns
+- CSV ingestion
+- message deduplication per campaign
+- sender rotation
+- controlled retry behavior
+
+### Media
+- optional campaign images
+- Cloudinary-backed asset storage
+- one-to-many campaign/media relationship
+- WhatsApp send flow with caption on the first image
+
+## Repository layout
+
+```text
+service/
+  backend/            FastAPI API, Alembic, SQLAlchemy models
+  frontend/           React + TypeScript + Vite UI
+  workers/whatsapp/   Node.js worker for sessions and dispatch
+
+docs/
+  incidents/          Incident index and operational notes
+  roadmap.md          Project roadmap
+  phase-2-session-lifecycle.md
 ```
 
-## Screenshots (placeholders)
+## Local development
 
-Add your images here:
+### Requirements
 
-- Dashboard image:
-  `docs/images/dashboard.png`
-- Campaign list image:
-  `docs/images/campaigns.png`
-- Channel/QR image:
-  `docs/images/channels.png`
-- Campaign detail image:
-  `docs/images/campaign-detail.png`
+- Docker + Docker Compose
+- Node.js 20+
+- Python 3.12+
+- PostgreSQL
 
-Example usage:
+### Main environment variables
+
+- `DB_URL`
+- `JWT_SECRET`
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
+- `CLOUDINARY_FOLDER`
+
+See [.env-template](.env-template) for the current baseline.
+
+### Useful commands
+
+```bash
+docker compose up -d
 ```
+
+Run the local stack with tighter CPU and memory limits to approximate the 4 GB VPS profile:
+
+```bash
+docker compose -f docker-compose.dev.yml -f docker-compose.dev-lowmem.yml up -d --build
+```
+
+```bash
+cd service/backend
+alembic upgrade head
+```
+
+```bash
+cd service/frontend
+npm ci
+npm run dev
+```
+
+```bash
+cd service/workers/whatsapp
+npm ci
+npm run dev
+```
+
+## Screenshots
+
+Add product screenshots here when you are ready:
+
+- `docs/images/dashboard.png`
+- `docs/images/campaigns.png`
+- `docs/images/channels.png`
+- `docs/images/campaign-detail.png`
+- `docs/images/create-campaign-with-media.png`
+
+Example:
+
+```md
 ![Dashboard](docs/images/dashboard.png)
 ```
 
-## Status
+## Operational status
 
-The MVP is functional and ready for controlled testing. Current focus:
-- access control (roles/permissions),
-- session stability and observability,
-- minimal CI/CD for cloud deployment.
+The current build already includes:
+
+- passive sender lifecycle
+- QR on-demand flow
+- session recovery hardening
+- baseline send rhythm calibration
+- optional campaign image support
+
+The next steps are mostly about continued real-world validation, recovery edge cases, and further anti-blocking tuning.
+
+## Notes for reviewers
+
+If you are reviewing this project as a recruiter, collaborator, or client, the most relevant parts are:
+
+- `service/backend/src/domain/models.py`
+- `service/workers/whatsapp/src/application/managers/session.manager.ts`
+- `service/workers/whatsapp/src/application/managers/campaign.manager.ts`
+- `service/workers/whatsapp/src/infrastructure/providers/whatsapp.provider.ts`
+- `docs/phase-2-session-lifecycle.md`
+
+These files show the main architectural decisions around reliability, runtime cost control, and campaign execution.
