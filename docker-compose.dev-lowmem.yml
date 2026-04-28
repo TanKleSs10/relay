@@ -1,0 +1,16 @@
+services:
+  api:
+    mem_limit: 384m
+    cpus: 0.35
+
+  db:
+    mem_limit: 512m
+    cpus: 0.5
+
+  wa-engine:
+    mem_limit: 1800m
+    cpus: 1.25
+
+  frontend:
+    mem_limit: 384m
+    cpus: 0.35

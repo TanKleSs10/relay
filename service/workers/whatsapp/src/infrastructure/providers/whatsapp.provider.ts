@@ -1,5 +1,5 @@
 import whatsapp from "whatsapp-web.js";
-import type { Client } from "whatsapp-web.js";
+import type { Client, Message } from "whatsapp-web.js";
 
 import type {
   MessageProvider,
@@ -20,6 +20,11 @@ type SenderEntry = {
   readyHandled?: boolean;
   clearing?: boolean;
 };
+
+const MESSAGE_ACK_SERVER = 1;
+const MESSAGE_ACK_ERROR = -1;
+const MESSAGE_ACK_TIMEOUT_MS = 12_000;
+const MESSAGE_ACK_POLL_INTERVAL_MS = 400;
 
 // Adapter that isolates whatsapp-web.js usage behind MessageProvider.
 export class WhatsAppProvider implements MessageProvider {
@@ -232,7 +237,8 @@ export class WhatsAppProvider implements MessageProvider {
     });
     try {
       if (media.length === 0) {
-        await entry.client.sendMessage(recipient, message);
+        const sentMessage = await entry.client.sendMessage(recipient, message);
+        await waitForConfirmedAck(entry.client, sentMessage);
       } else {
         const MessageMedia = (whatsapp as any).MessageMedia;
         for (const [index, item] of media.entries()) {
@@ -244,7 +250,12 @@ export class WhatsAppProvider implements MessageProvider {
             index === 0 && message.trim()
               ? { caption: message }
               : undefined;
-          await entry.client.sendMessage(recipient, outboundMedia, options);
+          const sentMessage = await entry.client.sendMessage(
+            recipient,
+            outboundMedia,
+            options
+          );
+          await waitForConfirmedAck(entry.client, sentMessage);
         }
       }
       this.eventBus.emit({
@@ -351,4 +362,36 @@ function normalizeRecipient(to: string): string {
   }
   const digits = to.replace(/[^\d]/g, "");
   return `${digits}@c.us`;
+}
+
+async function waitForConfirmedAck(
+  client: Client,
+  message: Message
+): Promise<void> {
+  const messageId = message?.id?._serialized;
+  if (!messageId) {
+    throw new Error("message ack unavailable: missing message id");
+  }
+
+  const startedAt = Date.now();
+  let currentAck = message.ack;
+
+  while (Date.now() - startedAt < MESSAGE_ACK_TIMEOUT_MS) {
+    if (currentAck >= MESSAGE_ACK_SERVER) {
+      return;
+    }
+    if (currentAck === MESSAGE_ACK_ERROR) {
+      throw new Error(`message ack error for ${messageId}`);
+    }
+
+    await delay(MESSAGE_ACK_POLL_INTERVAL_MS);
+    const refreshed = await client.getMessageById(messageId);
+    currentAck = refreshed?.ack ?? currentAck;
+  }
+
+  throw new Error(`message ack timeout for ${messageId}`);
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

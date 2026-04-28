@@ -1,73 +1,82 @@
-# React + TypeScript + Vite
+# Relay Engine Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This frontend is the operator dashboard for Relay Engine.
 
-Currently, two official plugins are available:
+It is built with:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- React
+- TypeScript
+- Vite
+- TanStack Query
+- React Hook Form
+- Zod
 
-## React Compiler
+## Purpose
 
-The React Compiler is currently not compatible with SWC. See [this issue](https://github.com/vitejs/vite-plugin-react/issues/428) for tracking the progress.
+The UI is responsible for:
 
-## Expanding the ESLint configuration
+- authentication
+- sender onboarding and QR handling
+- campaign creation from CSV
+- optional media attachment during campaign creation
+- campaign monitoring and retry flows
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Main screens
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- Login
+- Dashboard
+- Campaign list
+- Create campaign
+- Manage channels / QR flow
+- Campaign detail and metrics
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Development
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Install dependencies:
+
+```bash
+npm ci
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Run locally:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev
 ```
+
+Create a production build:
+
+```bash
+npm run build
+```
+
+## API behavior
+
+The frontend expects the API to be available under:
+
+- `VITE_API_BASE_URL`
+
+If it is not provided, production builds fall back to:
+
+- `/api`
+
+This is intended to work cleanly behind the project Nginx setup.
+
+## Screenshots
+
+Add frontend screenshots here when available:
+
+- `../../docs/images/login.png`
+- `../../docs/images/dashboard.png`
+- `../../docs/images/manage-channels.png`
+- `../../docs/images/create-campaign.png`
+
+Example:
+
+```md
+![Create Campaign](../../docs/images/create-campaign.png)
+```
+
+## Notes
+
+This frontend intentionally stays operational and product-focused rather than overly decorative. Most of the complexity in the project lives in session lifecycle handling, campaign orchestration, and worker/runtime control on the backend side.

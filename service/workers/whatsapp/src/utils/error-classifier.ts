@@ -3,6 +3,7 @@ export type WorkerErrorCategory =
   | "target_closed"
   | "auth_invalid"
   | "profile_lock"
+  | "recipient_unresolved"
   | "timeout"
   | "not_initialized"
   | "protocol"
@@ -22,6 +23,18 @@ export function classifyWorkerError(error: unknown): WorkerErrorCategory {
   }
   if (message.includes("target closed")) {
     return "target_closed";
+  }
+  if (
+    message.includes("no lid for user") ||
+    message.includes("not a whatsapp user") ||
+    message.includes("not registered") ||
+    message.includes("recipient is not registered") ||
+    message.includes("invalid number") ||
+    message.includes("invalid jid") ||
+    message.includes("wid error") ||
+    message.includes("jid error")
+  ) {
+    return "recipient_unresolved";
   }
   if (
     message.includes("auth failure") ||
