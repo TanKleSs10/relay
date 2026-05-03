@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 from shutil import rmtree
+from uuid import UUID, uuid4
+
+from sqlalchemy import func
 from sqlalchemy.orm import Session
-from uuid import UUID
 
 from src.api.schemas.sender_accounts import SenderAccountCreate, SenderAccountUpdate
 from src.application.errors import ConflictError
@@ -14,31 +16,47 @@ from src.domain import (
     SenderSession,
     SenderSessionHealth,
 )
-from uuid import UUID, uuid4
 
-MAX_SENDER_ACCOUNTS = 8
+MAX_SENDER_ACCOUNTS_PER_WORKSPACE = 4
 
 
 def get_sender_accounts_by_status(
-    db: Session, status: SenderAccountStatus
+    db: Session,
+    status: SenderAccountStatus,
+    workspace_ids: list[UUID] | None = None,
+) -> list[SenderAccount]:
+    query = db.query(SenderAccount).filter(SenderAccount.status == status)
+    if workspace_ids is not None:
+        query = query.filter(SenderAccount.workspace_id.in_(workspace_ids))
+    return query.all()
+
+
+def list_sender_accounts(
+    db: Session,
+    workspace_ids: list[UUID],
 ) -> list[SenderAccount]:
     return (
         db.query(SenderAccount)
-        .filter(SenderAccount.status == status)
+        .filter(SenderAccount.workspace_id.in_(workspace_ids))
+        .order_by(SenderAccount.created_at.desc())
         .all()
     )
 
 
-def list_sender_accounts(db: Session) -> list[SenderAccount]:
-    return db.query(SenderAccount).order_by(SenderAccount.created_at.desc()).all()
-
-
 def create_sender_account(
-    db: Session, payload: SenderAccountCreate | None = None
+    db: Session,
+    payload: SenderAccountCreate,
 ) -> SenderAccount:
-    sender_count = db.query(SenderAccount).count()
-    if sender_count >= MAX_SENDER_ACCOUNTS:
-        raise ConflictError(f"Sender limit reached (max {MAX_SENDER_ACCOUNTS})")
+    sender_count = (
+        db.query(func.count(SenderAccount.id))
+        .filter(SenderAccount.workspace_id == payload.workspace_id)
+        .scalar()
+        or 0
+    )
+    if sender_count >= MAX_SENDER_ACCOUNTS_PER_WORKSPACE:
+        raise ConflictError(
+            f"Sender limit reached for this workspace (max {MAX_SENDER_ACCOUNTS_PER_WORKSPACE})"
+        )
 
     label = None
     if payload:
@@ -49,13 +67,21 @@ def create_sender_account(
         label=label,
         status=SenderAccountStatus.CREATED,
         phone_number=None,
+        workspace_id=payload.workspace_id,
     )
     db.add(sender)
     return sender
 
 
-def get_sender_account_by_id(db: Session, sender_id: UUID) -> SenderAccount | None:
-    return db.query(SenderAccount).filter(SenderAccount.id == sender_id).first()
+def get_sender_account_by_id(
+    db: Session,
+    sender_id: UUID,
+    workspace_ids: list[UUID] | None = None,
+) -> SenderAccount | None:
+    query = db.query(SenderAccount).filter(SenderAccount.id == sender_id)
+    if workspace_ids is not None:
+        query = query.filter(SenderAccount.workspace_id.in_(workspace_ids))
+    return query.first()
 
 
 def delete_sender_account(db: Session, sender: SenderAccount) -> None:

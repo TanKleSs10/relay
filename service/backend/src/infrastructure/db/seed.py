@@ -10,6 +10,9 @@ from src.domain.models import (
     User,
     UserRole,
     UserStatus,
+    Workspace,
+    WorkspaceMembership,
+    WorkspaceMembershipRole,
 )
 from src.security.passwords import hash_password
 
@@ -24,6 +27,8 @@ DEFAULT_PERMISSIONS = [
 USER_PERMISSIONS = [
     "sender.manage",
 ]
+DEFAULT_WORKSPACE_NAME = "Default Workspace"
+DEFAULT_WORKSPACE_SLUG = "default"
 
 
 def seed_default_data(db: Session) -> None:
@@ -35,6 +40,12 @@ def seed_default_data(db: Session) -> None:
     if not role_admin:
         role_admin = Role(name="ADMIN")
         db.add(role_admin)
+        db.flush()
+
+    role_superadmin = db.query(Role).filter(Role.name == "SUPERADMIN").first()
+    if not role_superadmin:
+        role_superadmin = Role(name="SUPERADMIN")
+        db.add(role_superadmin)
         db.flush()
 
     role_user = db.query(Role).filter(Role.name == "USER").first()
@@ -59,6 +70,22 @@ def seed_default_data(db: Session) -> None:
         )
         if not exists:
             db.add(RolePermission(role_id=role_admin.id, permission_id=permission.id))
+
+        superadmin_exists = (
+            db.query(RolePermission)
+            .filter(
+                RolePermission.role_id == role_superadmin.id,
+                RolePermission.permission_id == permission.id,
+            )
+            .first()
+        )
+        if not superadmin_exists:
+            db.add(
+                RolePermission(
+                    role_id=role_superadmin.id,
+                    permission_id=permission.id,
+                )
+            )
 
         if code in USER_PERMISSIONS:
             user_exists = (
@@ -85,10 +112,37 @@ def seed_default_data(db: Session) -> None:
 
     user_role = (
         db.query(UserRole)
-        .filter(UserRole.user_id == user.id, UserRole.role_id == role_admin.id)
+        .filter(UserRole.user_id == user.id, UserRole.role_id == role_superadmin.id)
         .first()
     )
     if not user_role:
-        db.add(UserRole(user_id=user.id, role_id=role_admin.id))
+        db.add(UserRole(user_id=user.id, role_id=role_superadmin.id))
+
+    workspace = db.query(Workspace).filter(Workspace.slug == DEFAULT_WORKSPACE_SLUG).first()
+    if not workspace:
+        workspace = Workspace(
+            name=DEFAULT_WORKSPACE_NAME,
+            slug=DEFAULT_WORKSPACE_SLUG,
+            is_active=True,
+        )
+        db.add(workspace)
+        db.flush()
+
+    membership = (
+        db.query(WorkspaceMembership)
+        .filter(
+            WorkspaceMembership.workspace_id == workspace.id,
+            WorkspaceMembership.user_id == user.id,
+        )
+        .first()
+    )
+    if not membership:
+        db.add(
+            WorkspaceMembership(
+                workspace_id=workspace.id,
+                user_id=user.id,
+                role=WorkspaceMembershipRole.WORKSPACE_ADMIN,
+            )
+        )
 
     db.commit()

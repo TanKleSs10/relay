@@ -1,6 +1,7 @@
-from __future__ import annotations
-from sqlalchemy.orm import Session
 from uuid import UUID
+
+from sqlalchemy.orm import Session
+
 from src.api.schemas.messages import MessageCreate, MessageUpdate
 from src.application.errors import NotFoundError
 from src.api.service.campaigns import get_campaign_by_id
@@ -12,11 +13,16 @@ from src.api.service.messages import (
     update_message,
 )
 from src.domain import MessageStatus
-from src.domain.models import Message
+from src.domain.models import Message, User
+from src.security.auth import get_accessible_workspace_ids
 
 
-def create_message(db: Session, payload: MessageCreate) -> Message:
-    campaign = get_campaign_by_id(db, payload.campaign_id)
+def create_message(db: Session, payload: MessageCreate, actor: User) -> Message:
+    campaign = get_campaign_by_id(
+        db,
+        payload.campaign_id,
+        workspace_ids=get_accessible_workspace_ids(actor, db),
+    )
     if not campaign:
         raise NotFoundError("Campaign not found")
 
@@ -43,29 +49,47 @@ def create_message(db: Session, payload: MessageCreate) -> Message:
 
 def get_messages(
     db: Session,
+    actor: User,
     skip: int = 0,
     limit: int = 100,
     campaign_id: UUID | None = None,
     status: MessageStatus | None = None,
 ):
     return list_messages_filtered(
-        db, campaign_id=campaign_id, status=status, skip=skip, limit=limit
+        db,
+        campaign_id=campaign_id,
+        status=status,
+        workspace_ids=get_accessible_workspace_ids(actor, db),
+        skip=skip,
+        limit=limit,
     )
 
 
-def get_message(message_id: UUID, db: Session):
-    message = get_message_by_id(db, message_id)
+def get_message(message_id: UUID, db: Session, actor: User):
+    message = get_message_by_id(
+        db,
+        message_id,
+        workspace_ids=get_accessible_workspace_ids(actor, db),
+    )
     if not message:
         raise NotFoundError("Message not found")
     return message
 
 
-def remove_message(message_id: UUID, db: Session):
-    message = get_message_by_id(db, message_id)
+def remove_message(message_id: UUID, db: Session, actor: User):
+    message = get_message_by_id(
+        db,
+        message_id,
+        workspace_ids=get_accessible_workspace_ids(actor, db),
+    )
     if not message:
         raise NotFoundError("Message not found")
     try:
-        campaign = get_campaign_by_id(db, message.campaign_id)
+        campaign = get_campaign_by_id(
+            db,
+            message.campaign_id,
+            workspace_ids=get_accessible_workspace_ids(actor, db),
+        )
         if campaign:
             campaign.total_messages = max(campaign.total_messages - 1, 0)
             if message.status == MessageStatus.SENT:
@@ -80,9 +104,16 @@ def remove_message(message_id: UUID, db: Session):
 
 
 def update_message_item(
-    message_id: UUID, payload: MessageUpdate, db: Session
+    message_id: UUID,
+    payload: MessageUpdate,
+    db: Session,
+    actor: User,
 ) -> Message:
-    message = get_message_by_id(db, message_id)
+    message = get_message_by_id(
+        db,
+        message_id,
+        workspace_ids=get_accessible_workspace_ids(actor, db),
+    )
     if not message:
         raise NotFoundError("Message not found")
     try:

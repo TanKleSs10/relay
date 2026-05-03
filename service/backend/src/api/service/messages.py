@@ -1,8 +1,10 @@
 from __future__ import annotations
 import hashlib
 import re
-from sqlalchemy.orm import Session
 from uuid import UUID
+
+from sqlalchemy.orm import Session
+
 from src.application.errors import ConflictError
 from src.domain import Campaign, Message, MessageStatus
 from src.infrastructure.machine.message_machine import can_transition
@@ -46,18 +48,28 @@ def create_messages(
     return message
 
 
-def get_message_by_id(db: Session, message_id: UUID) -> Message | None:
-    return db.query(Message).filter(Message.id == message_id).first()
+def get_message_by_id(
+    db: Session,
+    message_id: UUID,
+    workspace_ids: list[UUID] | None = None,
+) -> Message | None:
+    query = db.query(Message).join(Campaign, Campaign.id == Message.campaign_id)
+    if workspace_ids is not None:
+        query = query.filter(Campaign.workspace_id.in_(workspace_ids))
+    return query.filter(Message.id == message_id).first()
 
 
 def list_messages_filtered(
     db: Session,
     campaign_id: UUID | None = None,
     status: MessageStatus | None = None,
+    workspace_ids: list[UUID] | None = None,
     skip: int = 0,
     limit: int = 100,
 ) -> list[Message]:
-    query = db.query(Message)
+    query = db.query(Message).join(Campaign, Campaign.id == Message.campaign_id)
+    if workspace_ids is not None:
+        query = query.filter(Campaign.workspace_id.in_(workspace_ids))
     if campaign_id is not None:
         query = query.filter(Message.campaign_id == campaign_id)
     if status is not None:
@@ -69,8 +81,11 @@ def count_messages_filtered(
     db: Session,
     campaign_id: UUID | None = None,
     status: MessageStatus | None = None,
+    workspace_ids: list[UUID] | None = None,
 ) -> int:
-    query = db.query(Message)
+    query = db.query(Message).join(Campaign, Campaign.id == Message.campaign_id)
+    if workspace_ids is not None:
+        query = query.filter(Campaign.workspace_id.in_(workspace_ids))
     if campaign_id is not None:
         query = query.filter(Message.campaign_id == campaign_id)
     if status is not None:

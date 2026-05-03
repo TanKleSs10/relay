@@ -16,6 +16,7 @@ class CampaignBase(APIModel):
 
 class CampaignCreate(CampaignBase):
     status: CampaignStatus | None = None
+    workspace_id: UUID4 | None = None
 
 
 class CampaignUpdate(APIModel):
@@ -36,6 +37,7 @@ class CampaignMetrics(APIModel):
 
 class CampaignRead(CampaignBase):
     id: UUID4
+    workspace_id: UUID4
     status: CampaignStatus
     created_at: datetime
     started_at: datetime | None = None

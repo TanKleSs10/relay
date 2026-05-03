@@ -1,10 +1,11 @@
 from datetime import datetime
 from uuid import UUID
-from sqlalchemy import func
+
 from fastapi import UploadFile
+from sqlalchemy import func
 from sqlalchemy.orm import Session
+
 from src.api.schemas.campaigns import CampaignCreate, CampaignUpdate
-from src.application.errors import ConflictError, NotFoundError
 from src.api.service.campaigns import (
     create_campaign,
     delete_campaign,
@@ -14,16 +15,18 @@ from src.api.service.campaigns import (
     update_campaign as update_campaign_service,
 )
 from src.api.service.messages import create_messages, reset_messages_by_campaign
-from src.domain.models import Campaign, SenderAccount, Message
-from src.domain import CampaignStatus, SenderAccountStatus, MessageStatus
+from src.application.errors import ConflictError, NotFoundError
+from src.domain import CampaignStatus, MessageStatus, SenderAccountStatus
+from src.domain.models import Campaign, Message, SenderAccount, User
 from src.infrastructure.file_readers.factory import get_reader
 from src.infrastructure.machine.campaign_machine import can_transition
+from src.security.auth import get_accessible_workspace_ids, resolve_workspace_id
 
 
-def _ensure_unique_campaign_name(db: Session, name: str) -> None:
-    existing = get_campaign_by_name(db, name)
+def _ensure_unique_campaign_name(db: Session, workspace_id: UUID, name: str) -> None:
+    existing = get_campaign_by_name(db, workspace_id, name)
     if existing:
-        raise ConflictError("Campaign with this name already exists")
+        raise ConflictError("Campaign with this name already exists in this workspace")
 
 
 def _extract_message_row(
@@ -38,24 +41,30 @@ def _extract_message_row(
     return recipient_str, content_str, external_id_str
 
 
-def create_campaign_with_file(name: str, file: UploadFile | None, db: Session):
+def create_campaign_with_file(
+    name: str,
+    file: UploadFile | None,
+    db: Session,
+    actor: User,
+    workspace_id: UUID | None = None,
+):
     try:
-        _ensure_unique_campaign_name(db, name)
+        target_workspace_id = resolve_workspace_id(actor, workspace_id, db)
+        _ensure_unique_campaign_name(db, target_workspace_id, name)
 
-        # Create campaign
-        campaign = create_campaign(db, CampaignCreate(name=name))
+        campaign = create_campaign(
+            db,
+            CampaignCreate(name=name, workspace_id=target_workspace_id),
+        )
         db.flush()
 
-        # If there's no file, just commit and return with empty summary
         if not file:
             db.commit()
             db.refresh(campaign)
             return campaign, 0, []
 
-        # Read file and create messages
         reader = get_reader(str(file.filename))
         data: list[dict[str, str]] = reader.read(file)
-        print(f"Data read from file: {data}")
         created = 0
         invalid_rows: list[dict[str, object]] = []
 
@@ -85,9 +94,10 @@ def create_campaign_with_file(name: str, file: UploadFile | None, db: Session):
         raise exc
 
 
-def create_campaigns(db: Session, payload: CampaignCreate) -> Campaign:
+def create_campaigns(db: Session, payload: CampaignCreate, actor: User) -> Campaign:
     try:
-        _ensure_unique_campaign_name(db, payload.name)
+        target_workspace_id = resolve_workspace_id(actor, payload.workspace_id, db)
+        _ensure_unique_campaign_name(db, target_workspace_id, payload.name)
 
         if payload.status and payload.status not in {
             CampaignStatus.CREATED,
@@ -95,7 +105,10 @@ def create_campaigns(db: Session, payload: CampaignCreate) -> Campaign:
         }:
             raise ConflictError("Campaign status can only start as CREATED or PAUSED")
 
-        campaign = create_campaign(db, payload)
+        campaign = create_campaign(
+            db,
+            payload.model_copy(update={"workspace_id": target_workspace_id}),
+        )
         db.commit()
         db.refresh(campaign)
         return campaign
@@ -104,19 +117,32 @@ def create_campaigns(db: Session, payload: CampaignCreate) -> Campaign:
         raise exc
 
 
-def get_campaigns(db: Session):
-    return list_campaigns(db)
+def get_campaigns(db: Session, actor: User) -> list[Campaign]:
+    return list_campaigns(db, workspace_ids=get_accessible_workspace_ids(actor, db))
 
 
-def get_campaign(campaign_id: UUID, db: Session):
-    campaign = get_campaign_by_id(db, campaign_id)
+def get_campaign(campaign_id: UUID, db: Session, actor: User) -> Campaign:
+    campaign = get_campaign_by_id(
+        db,
+        campaign_id,
+        workspace_ids=get_accessible_workspace_ids(actor, db),
+    )
     if not campaign:
         raise NotFoundError("Campaign not found")
     return campaign
 
 
-def update_campaign(campaign_id: UUID, payload: CampaignUpdate, db: Session):
-    campaign = get_campaign_by_id(db, campaign_id)
+def update_campaign(
+    campaign_id: UUID,
+    payload: CampaignUpdate,
+    db: Session,
+    actor: User,
+) -> Campaign:
+    campaign = get_campaign_by_id(
+        db,
+        campaign_id,
+        workspace_ids=get_accessible_workspace_ids(actor, db),
+    )
     if not campaign:
         raise NotFoundError("Campaign not found")
 
@@ -135,50 +161,68 @@ def update_campaign(campaign_id: UUID, payload: CampaignUpdate, db: Session):
         raise exc
 
 
-def remove_campaign(campaign_id: UUID, db: Session):
-    campaign = get_campaign_by_id(db, campaign_id)
+def remove_campaign(campaign_id: UUID, db: Session, actor: User) -> dict[str, str]:
+    campaign = get_campaign_by_id(
+        db,
+        campaign_id,
+        workspace_ids=get_accessible_workspace_ids(actor, db),
+    )
     if not campaign:
         raise NotFoundError("Campaign not found")
     if campaign.status == CampaignStatus.ACTIVE:
         raise ConflictError("Cannot delete a campaign that is currently active")
+
     try:
         delete_campaign(db, campaign)
         db.commit()
     except Exception as exc:
         db.rollback()
         raise exc
-    return {
-        "status": "success",
-        "message": f"Campaign with id {campaign_id} deleted successfully.",
-    }
+
+    return {"status": "success", "message": "Campaign deleted successfully"}
 
 
-def dispatch_campaign(campaign_id: UUID, db: Session) -> dict[str, UUID]:
-    campaign = get_campaign_by_id(db, campaign_id)
+def dispatch_campaign(
+    campaign_id: UUID,
+    db: Session,
+    actor: User,
+) -> dict[str, UUID]:
+    campaign = get_campaign_by_id(
+        db,
+        campaign_id,
+        workspace_ids=get_accessible_workspace_ids(actor, db),
+    )
     if not campaign:
         raise NotFoundError("Campaign not found")
     if not can_transition(campaign.status, CampaignStatus.ACTIVE):
         raise ConflictError(
             f"Campaign cannot be activated from status {campaign.status}"
         )
+
     active = (
         db.query(Campaign)
-        .filter(Campaign.status == CampaignStatus.ACTIVE, Campaign.id != campaign_id)
+        .filter(
+            Campaign.status == CampaignStatus.ACTIVE,
+            Campaign.id != campaign_id,
+            Campaign.workspace_id == campaign.workspace_id,
+        )
         .first()
     )
     if active:
-        raise ConflictError("Another campaign is already ACTIVE")
+        raise ConflictError("Another campaign is already ACTIVE in this workspace")
+
     available_sender = (
         db.query(SenderAccount)
         .filter(
+            SenderAccount.workspace_id == campaign.workspace_id,
             SenderAccount.status.in_(
                 [SenderAccountStatus.CONNECTED, SenderAccountStatus.IDLE]
-            )
+            ),
         )
         .first()
     )
     if not available_sender:
-        raise ConflictError("No CONNECTED or IDLE senders available")
+        raise ConflictError("No CONNECTED or IDLE senders available in this workspace")
 
     try:
         campaign.status = CampaignStatus.ACTIVE
@@ -190,12 +234,17 @@ def dispatch_campaign(campaign_id: UUID, db: Session) -> dict[str, UUID]:
         raise exc
 
 
-def pause_campaign(campaign_id: UUID, db: Session) -> dict[str, UUID]:
-    campaign = get_campaign_by_id(db, campaign_id)
+def pause_campaign(campaign_id: UUID, db: Session, actor: User) -> dict[str, UUID]:
+    campaign = get_campaign_by_id(
+        db,
+        campaign_id,
+        workspace_ids=get_accessible_workspace_ids(actor, db),
+    )
     if not campaign:
         raise NotFoundError("Campaign not found")
     if not can_transition(campaign.status, CampaignStatus.PAUSED):
         raise ConflictError(f"Campaign cannot be paused from status {campaign.status}")
+
     try:
         campaign.status = CampaignStatus.PAUSED
         db.commit()
@@ -205,30 +254,41 @@ def pause_campaign(campaign_id: UUID, db: Session) -> dict[str, UUID]:
         raise exc
 
 
-def retry_campaign(campaign_id: UUID, db: Session) -> dict[str, int]:
-    campaign = get_campaign_by_id(db, campaign_id)
+def retry_campaign(campaign_id: UUID, db: Session, actor: User) -> dict[str, int]:
+    campaign = get_campaign_by_id(
+        db,
+        campaign_id,
+        workspace_ids=get_accessible_workspace_ids(actor, db),
+    )
     if not campaign:
         raise NotFoundError("Campaign not found")
     if not can_transition(campaign.status, CampaignStatus.ACTIVE):
         raise ConflictError(f"Campaign cannot be retried from status {campaign.status}")
+
     active = (
         db.query(Campaign)
-        .filter(Campaign.status == CampaignStatus.ACTIVE, Campaign.id != campaign_id)
+        .filter(
+            Campaign.status == CampaignStatus.ACTIVE,
+            Campaign.id != campaign_id,
+            Campaign.workspace_id == campaign.workspace_id,
+        )
         .first()
     )
     if active:
-        raise ConflictError("Another campaign is already ACTIVE")
+        raise ConflictError("Another campaign is already ACTIVE in this workspace")
+
     available_sender = (
         db.query(SenderAccount)
         .filter(
+            SenderAccount.workspace_id == campaign.workspace_id,
             SenderAccount.status.in_(
                 [SenderAccountStatus.CONNECTED, SenderAccountStatus.IDLE]
-            )
+            ),
         )
         .first()
     )
     if not available_sender:
-        raise ConflictError("No CONNECTED or IDLE senders available")
+        raise ConflictError("No CONNECTED or IDLE senders available in this workspace")
 
     try:
         reset_count = reset_messages_by_campaign(db, campaign_id)
@@ -243,15 +303,21 @@ def retry_campaign(campaign_id: UUID, db: Session) -> dict[str, int]:
 def get_campaign_metrics(
     campaign_id: UUID,
     db: Session,
+    actor: User,
     created_from: datetime | None = None,
     created_to: datetime | None = None,
     sent_from: datetime | None = None,
     sent_to: datetime | None = None,
     include_no_wa: bool = True,
 ) -> dict[str, int | float | UUID]:
-    campaign = get_campaign_by_id(db, campaign_id)
+    campaign = get_campaign_by_id(
+        db,
+        campaign_id,
+        workspace_ids=get_accessible_workspace_ids(actor, db),
+    )
     if not campaign:
         raise NotFoundError("Campaign not found")
+
     query = db.query(Message.status, func.count(Message.id)).filter(
         Message.campaign_id == campaign_id
     )

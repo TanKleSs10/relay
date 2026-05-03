@@ -84,6 +84,44 @@ class WorkerStatus(str, Enum):
     BUSY = "BUSY"
 
 
+class WorkspaceMembershipRole(str, Enum):
+    WORKSPACE_ADMIN = "WORKSPACE_ADMIN"
+    SUPERVISOR = "SUPERVISOR"
+    OPERATOR = "OPERATOR"
+
+
+class Workspace(Base):
+    __tablename__ = "workspaces"
+
+    id: Mapped[PyUUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    name: Mapped[str] = mapped_column(String(150), nullable=False, unique=True)
+    slug: Mapped[str] = mapped_column(String(150), nullable=False, unique=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    memberships: Mapped[list["WorkspaceMembership"]] = relationship(
+        "WorkspaceMembership",
+        back_populates="workspace",
+        cascade="all, delete-orphan",
+    )
+    campaigns: Mapped[list["Campaign"]] = relationship(
+        "Campaign", back_populates="workspace"
+    )
+    sender_accounts: Mapped[list["SenderAccount"]] = relationship(
+        "SenderAccount", back_populates="workspace"
+    )
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -110,6 +148,9 @@ class User(Base):
 
     roles: Mapped[list["UserRole"]] = relationship(
         "UserRole", back_populates="user", cascade="all, delete-orphan"
+    )
+    memberships: Mapped[list["WorkspaceMembership"]] = relationship(
+        "WorkspaceMembership", back_populates="user", cascade="all, delete-orphan"
     )
 
 
@@ -195,6 +236,40 @@ class UserRole(Base):
     role: Mapped[Role] = relationship("Role", back_populates="users")
 
 
+class WorkspaceMembership(Base):
+    __tablename__ = "workspace_memberships"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "user_id",
+            name="uq_workspace_memberships_workspace_user",
+        ),
+    )
+
+    id: Mapped[PyUUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    workspace_id: Mapped[PyUUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("workspaces.id"), nullable=False
+    )
+    user_id: Mapped[PyUUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    role: Mapped[WorkspaceMembershipRole] = mapped_column(
+        SAEnum(WorkspaceMembershipRole, name="workspace_membership_role"),
+        nullable=False,
+        default=WorkspaceMembershipRole.OPERATOR,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    workspace: Mapped[Workspace] = relationship(
+        "Workspace", back_populates="memberships"
+    )
+    user: Mapped[User] = relationship("User", back_populates="memberships")
+
+
 class Campaign(Base):
     __tablename__ = "campaigns"
 
@@ -206,6 +281,9 @@ class Campaign(Base):
         SAEnum(CampaignStatus, name="campaign_status"),
         nullable=False,
         default=CampaignStatus.CREATED,
+    )
+    workspace_id: Mapped[PyUUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("workspaces.id"), nullable=False
     )
     created_by_user_id: Mapped[PyUUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id")
@@ -228,6 +306,7 @@ class Campaign(Base):
     send_logs: Mapped[list["SendLog"]] = relationship(
         "SendLog", back_populates="campaign", cascade="all, delete-orphan"
     )
+    workspace: Mapped[Workspace] = relationship("Workspace", back_populates="campaigns")
 
 
 class Message(Base):
@@ -297,6 +376,9 @@ class SenderAccount(Base):
         nullable=False,
         default=SenderAccountStatus.CREATED,
     )
+    workspace_id: Mapped[PyUUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("workspaces.id"), nullable=False
+    )
     cooldown_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -323,6 +405,9 @@ class SenderAccount(Base):
         cascade="all, delete-orphan",
         single_parent=True,
         passive_deletes=True,
+    )
+    workspace: Mapped[Workspace] = relationship(
+        "Workspace", back_populates="sender_accounts"
     )
 
 

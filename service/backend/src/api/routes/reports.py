@@ -13,7 +13,8 @@ from src.api.routes.deps import get_db
 from src.application.errors import NotFoundError
 from src.api.service.campaigns import get_campaign_by_id
 from src.domain import Message, MessageStatus
-from src.security.auth import require_permission
+from src.domain.models import User
+from src.security.auth import get_accessible_workspace_ids, require_permission
 from src.security.permissions import PERM_CAMPAIGN_READ
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -23,14 +24,18 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 def export_campaign_messages(
     campaign_id: UUID,
     db: Session = Depends(get_db),
-    _: object = Depends(require_permission(PERM_CAMPAIGN_READ)),
+    user: User = Depends(require_permission(PERM_CAMPAIGN_READ)),
     status: MessageStatus | None = Query(default=None),
     created_from: datetime | None = Query(default=None),
     created_to: datetime | None = Query(default=None),
     sent_from: datetime | None = Query(default=None),
     sent_to: datetime | None = Query(default=None),
 ):
-    campaign = get_campaign_by_id(db, campaign_id)
+    campaign = get_campaign_by_id(
+        db,
+        campaign_id,
+        workspace_ids=get_accessible_workspace_ids(user, db),
+    )
     if not campaign:
         raise NotFoundError("Campaign not found")
 

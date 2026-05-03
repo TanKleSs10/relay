@@ -23,8 +23,9 @@ from src.application.usecases.sender_account_usecases import (
     update_sender as update_sender_usecase,
 )
 from src.api.service.sender_sessions import get_sender_session, list_session_logs
-from src.security.auth import require_permission
+from src.security.auth import get_accessible_workspace_ids, require_permission
 from src.security.permissions import PERM_SENDER_MANAGE
+from src.domain.models import User
 
 router = APIRouter(prefix="/sender-accounts", tags=["sender-accounts"])
 
@@ -33,9 +34,9 @@ router = APIRouter(prefix="/sender-accounts", tags=["sender-accounts"])
 def create_sender(
     payload: SenderAccountCreate | None = None,
     db: Session = Depends(get_db),
-    _: object = Depends(require_permission(PERM_SENDER_MANAGE)),
+    user: User = Depends(require_permission(PERM_SENDER_MANAGE)),
 ):
-    sender = create_sender_usecase(db, payload)
+    sender = create_sender_usecase(db, user, payload)
     return {"id": sender.id}
 
 
@@ -43,36 +44,36 @@ def create_sender(
 def create(
     payload: SenderAccountCreate | None = None,
     db: Session = Depends(get_db),
-    _: object = Depends(require_permission(PERM_SENDER_MANAGE)),
+    user: User = Depends(require_permission(PERM_SENDER_MANAGE)),
 ):
-    sender = create_sender_usecase(db, payload)
+    sender = create_sender_usecase(db, user, payload)
     return {"id": sender.id}
 
 
 @router.get("", response_model=list[SenderAccountRead])
 def list_items(
     db: Session = Depends(get_db),
-    _: object = Depends(require_permission(PERM_SENDER_MANAGE)),
+    user: User = Depends(require_permission(PERM_SENDER_MANAGE)),
 ):
-    return list_senders_usecase(db)
+    return list_senders_usecase(db, user)
 
 
 @router.get("/{sender_id}", response_model=SenderAccountRead)
 def get_item(
     sender_id: UUID,
     db: Session = Depends(get_db),
-    _: object = Depends(require_permission(PERM_SENDER_MANAGE)),
+    user: User = Depends(require_permission(PERM_SENDER_MANAGE)),
 ):
-    return get_sender_usecase(sender_id, db)
+    return get_sender_usecase(sender_id, db, user)
 
 
 @router.delete("/{sender_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_item(
     sender_id: UUID,
     db: Session = Depends(get_db),
-    _: object = Depends(require_permission(PERM_SENDER_MANAGE)),
+    user: User = Depends(require_permission(PERM_SENDER_MANAGE)),
 ):
-    remove_sender_usecase(sender_id, db)
+    remove_sender_usecase(sender_id, db, user)
     return None
 
 
@@ -81,36 +82,40 @@ def update_item(
     sender_id: UUID,
     payload: SenderAccountUpdate,
     db: Session = Depends(get_db),
-    _: object = Depends(require_permission(PERM_SENDER_MANAGE)),
+    user: User = Depends(require_permission(PERM_SENDER_MANAGE)),
 ):
-    return update_sender_usecase(sender_id, payload, db)
+    return update_sender_usecase(sender_id, payload, db, user)
 
 
 @router.post("/{sender_id}/reset-session", response_model=SenderAccountRead)
 def reset_session(
     sender_id: UUID,
     db: Session = Depends(get_db),
-    _: object = Depends(require_permission(PERM_SENDER_MANAGE)),
+    user: User = Depends(require_permission(PERM_SENDER_MANAGE)),
 ):
-    return reset_sender_usecase(sender_id, db)
+    return reset_sender_usecase(sender_id, db, user)
 
 
 @router.post("/{sender_id}/request-qr", response_model=SenderAccountRead)
 def request_qr(
     sender_id: UUID,
     db: Session = Depends(get_db),
-    _: object = Depends(require_permission(PERM_SENDER_MANAGE)),
+    user: User = Depends(require_permission(PERM_SENDER_MANAGE)),
 ):
-    return request_sender_qr_code_usecase(sender_id, db)
+    return request_sender_qr_code_usecase(sender_id, db, user)
 
 
 @router.get("/{sender_id}/session", response_model=SenderSessionRead | None)
 def get_session(
     sender_id: UUID,
     db: Session = Depends(get_db),
-    _: object = Depends(require_permission(PERM_SENDER_MANAGE)),
+    user: User = Depends(require_permission(PERM_SENDER_MANAGE)),
 ):
-    session = get_sender_session(db, sender_id)
+    session = get_sender_session(
+        db,
+        sender_id,
+        workspace_ids=get_accessible_workspace_ids(user, db),
+    )
     if not session:
         return None
     return session
@@ -120,9 +125,13 @@ def get_session(
 def get_qr(
     sender_id: UUID,
     db: Session = Depends(get_db),
-    _: object = Depends(require_permission(PERM_SENDER_MANAGE)),
+    user: User = Depends(require_permission(PERM_SENDER_MANAGE)),
 ):
-    session = get_sender_session(db, sender_id)
+    session = get_sender_session(
+        db,
+        sender_id,
+        workspace_ids=get_accessible_workspace_ids(user, db),
+    )
     if not session:
         return {"sender_account_id": sender_id, "qr_code": None, "qr_generated_at": None}
     return {
@@ -136,6 +145,10 @@ def get_qr(
 def get_session_logs(
     sender_id: UUID,
     db: Session = Depends(get_db),
-    _: object = Depends(require_permission(PERM_SENDER_MANAGE)),
+    user: User = Depends(require_permission(PERM_SENDER_MANAGE)),
 ):
-    return list_session_logs(db, sender_id)
+    return list_session_logs(
+        db,
+        sender_id,
+        workspace_ids=get_accessible_workspace_ids(user, db),
+    )
