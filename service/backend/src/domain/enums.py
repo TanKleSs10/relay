@@ -9,6 +9,7 @@ from src.domain.models import (
     UserStatus,
     WorkerStatus,
     WorkerType,
+    WorkspaceMembershipRole,
 )
 
 ENUM_REGISTRY = {
@@ -20,6 +21,7 @@ ENUM_REGISTRY = {
     "user_status": UserStatus,
     "worker_status": WorkerStatus,
     "worker_type": WorkerType,
+    "workspace_membership_role": WorkspaceMembershipRole,
 }
 
 

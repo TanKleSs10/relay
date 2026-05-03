@@ -10,22 +10,29 @@ from src.api.service.campaigns import get_campaign_by_id
 from src.api.service.media_assets import MediaAssetService
 from src.application.errors import NotFoundError, ValidationError
 from src.config import get_settings
+from src.domain.models import User
 from src.infrastructure.media.cloudinary_storage import CloudinaryMediaStorageProvider
+from src.security.auth import get_accessible_workspace_ids
 
 
 def upload_campaign_media(
     campaign_id: UUID,
     file: UploadFile,
     db: Session,
+    actor: User,
     *,
     created_by_user_id: UUID | None = None,
 ) :
     settings = get_settings()
-    campaign = get_campaign_by_id(db, campaign_id)
+    campaign = get_campaign_by_id(
+        db,
+        campaign_id,
+        workspace_ids=get_accessible_workspace_ids(actor, db),
+    )
     if not campaign:
         raise NotFoundError("Campaign not found")
 
-    existing_media = list_campaign_media(campaign_id, db)
+    existing_media = list_campaign_media(campaign_id, db, actor)
     if len(existing_media) >= settings.media_max_images_per_campaign:
         raise ValidationError(
             f"Campaign image limit reached (max {settings.media_max_images_per_campaign})"
@@ -66,8 +73,12 @@ def upload_campaign_media(
         raise exc
 
 
-def list_campaign_media(campaign_id: UUID, db: Session):
-    campaign = get_campaign_by_id(db, campaign_id)
+def list_campaign_media(campaign_id: UUID, db: Session, actor: User):
+    campaign = get_campaign_by_id(
+        db,
+        campaign_id,
+        workspace_ids=get_accessible_workspace_ids(actor, db),
+    )
     if not campaign:
         raise NotFoundError("Campaign not found")
 
@@ -75,8 +86,17 @@ def list_campaign_media(campaign_id: UUID, db: Session):
     return service.list_campaign_media(db, campaign_id=campaign_id)
 
 
-def remove_campaign_media(campaign_id: UUID, media_asset_id: UUID, db: Session) -> None:
-    campaign = get_campaign_by_id(db, campaign_id)
+def remove_campaign_media(
+    campaign_id: UUID,
+    media_asset_id: UUID,
+    db: Session,
+    actor: User,
+) -> None:
+    campaign = get_campaign_by_id(
+        db,
+        campaign_id,
+        workspace_ids=get_accessible_workspace_ids(actor, db),
+    )
     if not campaign:
         raise NotFoundError("Campaign not found")
 

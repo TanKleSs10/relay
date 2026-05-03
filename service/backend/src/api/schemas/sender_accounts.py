@@ -15,7 +15,7 @@ class SenderAccountBase(APIModel):
 
 
 class SenderAccountCreate(SenderAccountBase):
-    pass
+    workspace_id: UUID4 | None = None
 
 
 class SenderAccountUpdate(APIModel):
@@ -27,6 +27,7 @@ class SenderAccountUpdate(APIModel):
 
 class SenderAccountRead(SenderAccountBase):
     id: UUID4
+    workspace_id: UUID4
     label: str
     cooldown_until: datetime | None
     last_sent_at: datetime | None

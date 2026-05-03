@@ -13,6 +13,7 @@ from src.api.routes.roles import router as roles_router
 from src.api.routes.permissions import router as permissions_router
 from src.api.routes.reports import router as reports_router
 from src.api.routes.workers import router as workers_router
+from src.api.routes.workspaces import router as workspaces_router
 from src.application.errors import (
     ConflictError,
     NotFoundError,
@@ -41,6 +42,7 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(users_router)
+app.include_router(workspaces_router)
 app.include_router(roles_router)
 app.include_router(permissions_router)
 app.include_router(reports_router)

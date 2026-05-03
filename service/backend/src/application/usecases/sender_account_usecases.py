@@ -15,11 +15,27 @@ from src.api.service.sender_accounts import (
     update_sender_account,
 )
 from src.domain import SenderAccount
+from src.domain.models import User
+from src.security.auth import get_accessible_workspace_ids, resolve_workspace_id
 
 
-def create_sender(db: Session, payload: SenderAccountCreate | None = None) -> SenderAccount:
+def create_sender(
+    db: Session,
+    actor: User,
+    payload: SenderAccountCreate | None = None,
+) -> SenderAccount:
     try:
-        sender = create_sender_account(db, payload)
+        target_workspace_id = resolve_workspace_id(
+            actor,
+            payload.workspace_id if payload else None,
+            db,
+        )
+        effective_payload = (
+            payload.model_copy(update={"workspace_id": target_workspace_id})
+            if payload
+            else SenderAccountCreate(workspace_id=target_workspace_id)
+        )
+        sender = create_sender_account(db, effective_payload)
         db.commit()
         db.refresh(sender)
         return sender
@@ -28,19 +44,27 @@ def create_sender(db: Session, payload: SenderAccountCreate | None = None) -> Se
         raise exc
 
 
-def list_senders(db: Session) -> list[SenderAccount]:
-    return list_sender_accounts(db)
+def list_senders(db: Session, actor: User) -> list[SenderAccount]:
+    return list_sender_accounts(db, get_accessible_workspace_ids(actor, db))
 
 
-def get_sender(sender_id: UUID, db: Session) -> SenderAccount:
-    sender = get_sender_account_by_id(db, sender_id)
+def get_sender(sender_id: UUID, db: Session, actor: User) -> SenderAccount:
+    sender = get_sender_account_by_id(
+        db,
+        sender_id,
+        workspace_ids=get_accessible_workspace_ids(actor, db),
+    )
     if not sender:
         raise NotFoundError("Sender account not found")
     return sender
 
 
-def remove_sender(sender_id: UUID, db: Session) -> None:
-    sender = get_sender_account_by_id(db, sender_id)
+def remove_sender(sender_id: UUID, db: Session, actor: User) -> None:
+    sender = get_sender_account_by_id(
+        db,
+        sender_id,
+        workspace_ids=get_accessible_workspace_ids(actor, db),
+    )
     if not sender:
         raise NotFoundError("Sender account not found")
     try:
@@ -52,9 +76,16 @@ def remove_sender(sender_id: UUID, db: Session) -> None:
 
 
 def update_sender(
-    sender_id: UUID, payload: SenderAccountUpdate, db: Session
+    sender_id: UUID,
+    payload: SenderAccountUpdate,
+    db: Session,
+    actor: User,
 ) -> SenderAccount:
-    sender = get_sender_account_by_id(db, sender_id)
+    sender = get_sender_account_by_id(
+        db,
+        sender_id,
+        workspace_ids=get_accessible_workspace_ids(actor, db),
+    )
     if not sender:
         raise NotFoundError("Sender account not found")
     try:
@@ -67,8 +98,12 @@ def update_sender(
         raise exc
 
 
-def reset_sender(sender_id: UUID, db: Session) -> SenderAccount:
-    sender = get_sender_account_by_id(db, sender_id)
+def reset_sender(sender_id: UUID, db: Session, actor: User) -> SenderAccount:
+    sender = get_sender_account_by_id(
+        db,
+        sender_id,
+        workspace_ids=get_accessible_workspace_ids(actor, db),
+    )
     if not sender:
         raise NotFoundError("Sender account not found")
     try:
@@ -81,8 +116,12 @@ def reset_sender(sender_id: UUID, db: Session) -> SenderAccount:
         raise exc
 
 
-def request_sender_qr_code(sender_id: UUID, db: Session) -> SenderAccount:
-    sender = get_sender_account_by_id(db, sender_id)
+def request_sender_qr_code(sender_id: UUID, db: Session, actor: User) -> SenderAccount:
+    sender = get_sender_account_by_id(
+        db,
+        sender_id,
+        workspace_ids=get_accessible_workspace_ids(actor, db),
+    )
     if not sender:
         raise NotFoundError("Sender account not found")
     try:
